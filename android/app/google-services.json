@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "314589508448",
+    "project_id": "papers-automation",
+    "storage_bucket": "papers-automation.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:314589508448:android:8dd744c195d995b44aa405",
+        "android_client_info": {
+          "package_name": "com.example.paperauto"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKp1H7RH8f7t3Dlb9YS8d_NpDycw4BeMU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
