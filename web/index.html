@@ -31,6 +31,26 @@
 
   <title>paperauto</title>
   <link rel="manifest" href="manifest.json">
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
+
+  <script>
+    // Your web app's Firebase configuration from firebase_options.dart
+    const firebaseConfig = {
+      apiKey: "AIzaSyBKT8Yt-DnGJLWzAdS7FuydyqzmZFtT43o",
+      authDomain: "papers-automation.firebaseapp.com",
+      projectId: "papers-automation",
+      storageBucket: "papers-automation.firebasestorage.app",
+      messagingSenderId: "314589508448",
+      appId: "1:314589508448:web:579ccb9db27854354aa405",
+      measurementId: "G-FRP7TN265G"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
