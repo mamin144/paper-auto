@@ -31,14 +31,15 @@ class _TestPaymentScreenState extends State<TestPaymentScreen> {
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => PaymentScreen(
-            amount: double.parse(_amountController.text),
-            currency: 'EGP', // Egyptian Pound
-            firstName: _firstNameController.text,
-            lastName: _lastNameController.text,
-            email: _emailController.text,
-            phone: _phoneController.text,
-          ),
+          builder:
+              (context) => PaymentScreen(
+                amount: double.parse(_amountController.text),
+                currency: 'EGP', // Egyptian Pound
+                firstName: _firstNameController.text,
+                lastName: _lastNameController.text,
+                email: _emailController.text,
+                phone: _phoneController.text,
+              ),
         ),
       );
 
@@ -62,9 +63,7 @@ class _TestPaymentScreenState extends State<TestPaymentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Test Payment'),
-      ),
+      appBar: AppBar(title: const Text('Test Payment')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -169,10 +168,7 @@ class _TestPaymentScreenState extends State<TestPaymentScreen> {
                   backgroundColor: Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text(
-                  'Pay Now',
-                  style: TextStyle(fontSize: 18),
-                ),
+                child: const Text('Pay Now', style: TextStyle(fontSize: 18)),
               ),
             ],
           ),

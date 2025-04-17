@@ -19,8 +19,10 @@ class _SplashScreenState extends State<SplashScreen> {
   _navigateToLogin() async {
     await Future.delayed(const Duration(milliseconds: 1000), () {});
     // ignore: use_build_context_synchronously
-    Navigator.pushReplacement(context,
-        MaterialPageRoute(builder: (context) => const PreHomeScreen()));
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const PreHomeScreen()),
+    );
   }
 
   @override
@@ -34,12 +36,12 @@ class _SplashScreenState extends State<SplashScreen> {
             SizedBox(
               height: 150,
               width: 150,
-              child: Image.asset('lib/pics/Group_2.png'),
+              // child: Image.asset('lib/pics/Group_2.png'),
             ),
             // ignore: avoid_unnecessary_containers
             Container(
               child: const Text(
-                'Agarly',
+                'Paper Automation',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
             ),

@@ -17,7 +17,7 @@ class PreHomeScreen extends StatelessWidget {
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color.fromARGB(255, 233, 188, 124), Color(0xFFFFFFFF)],
+                colors: [Color.fromARGB(255, 255, 255, 255), Color(0xFFFFFFFF)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -27,16 +27,17 @@ class PreHomeScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset(
-                  'lib/pics/Group_2.png',
-                  height: 120.0, // Adjust the height as needed
-                  width: 120.0, // Adjust the width as needed
-                ),
+                // Image.asset(
+                //   'lib/pics/Group_2.png',
+                //   height: 120.0, // Adjust the height as needed
+                //   width: 120.0, // Adjust the width as needed
+                // ),
                 const SizedBox(
-                    height: 16.0), // Add some space between image and text
+                  height: 16.0,
+                ), // Add some space between image and text
                 Container(
                   child: const Text(
-                    'Agarly',
+                    'Paper Automation',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -49,15 +50,14 @@ class PreHomeScreen extends StatelessWidget {
                 const SizedBox(height: 32.0),
                 RoundedButton(
                   text: 'Login',
-                  color: const Color(0xFFF9CF93),
+                  color: Colors.blue,
                   width: 304.0,
                   height: 59.0,
                   onPressed: () {
                     // Navigate to SignInPage when the "Login" button is pressed
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (context) => const LoginScreen()),
+                      MaterialPageRoute(builder: (context) => LoginScreen()),
                     );
                   },
                 ),
@@ -70,8 +70,7 @@ class PreHomeScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (context) => const SignInPage()),
+                      MaterialPageRoute(builder: (context) => SignIn()),
                     );
                   },
                 ),
@@ -115,10 +114,7 @@ class RoundedButton extends StatelessWidget {
         child: Center(
           child: Text(
             text,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
       ),

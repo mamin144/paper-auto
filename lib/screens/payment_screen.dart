@@ -64,28 +64,30 @@ class _PaymentScreenState extends State<PaymentScreen> {
       final paymentUrl = _payMobService.getFinalPaymentUrl(paymentKey);
 
       // Initialize WebView with payment URL
-      _controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setNavigationDelegate(NavigationDelegate(
-          onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
-          },
-          onNavigationRequest: (NavigationRequest request) {
-            // Handle success/failure URLs here
-            if (request.url.contains('success=true')) {
-              Navigator.pop(context, true); // Payment successful
-              return NavigationDecision.prevent;
-            } else if (request.url.contains('success=false')) {
-              Navigator.pop(context, false); // Payment failed
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
-        ))
-        ..loadRequest(Uri.parse(paymentUrl));
-
+      _controller =
+          WebViewController()
+            ..setJavaScriptMode(JavaScriptMode.unrestricted)
+            ..setNavigationDelegate(
+              NavigationDelegate(
+                onPageFinished: (String url) {
+                  setState(() {
+                    _isLoading = false;
+                  });
+                },
+                onNavigationRequest: (NavigationRequest request) {
+                  // Handle success/failure URLs here
+                  if (request.url.contains('success=true')) {
+                    Navigator.pop(context, true); // Payment successful
+                    return NavigationDecision.prevent;
+                  } else if (request.url.contains('success=false')) {
+                    Navigator.pop(context, false); // Payment failed
+                    return NavigationDecision.prevent;
+                  }
+                  return NavigationDecision.navigate;
+                },
+              ),
+            )
+            ..loadRequest(Uri.parse(paymentUrl));
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -113,12 +115,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(),
-            ),
+          if (_isLoading) const Center(child: CircularProgressIndicator()),
         ],
       ),
     );
   }
-} 
+}

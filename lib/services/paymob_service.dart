@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 
 class PayMobService {
-  final String apiKey = 'ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2TVRBeE1URXlOaXdpYm1GdFpTSTZJbWx1YVhScFlXd2lmUS52Wi1WZ2dZWDJucFhrUHdtUEZjWFFqVXZwZ2V5WVR2dWl6Zy12bDVsb1ozWE1wck9MZ3N5LXZ5aUtYU3lJVE5PMDdSOFRJeE1yWDU2bUdoMVJyYy1IUQ==';  // Replace with your PayMob API key
-  final String integrationId = '4896403';  // Replace with your Integration ID
-  final String iframeId = '886746';  // Replace with your IFrame ID
+  final String apiKey =
+      'ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2TVRBeE1URXlOaXdpYm1GdFpTSTZJbWx1YVhScFlXd2lmUS52Wi1WZ2dZWDJucFhrUHdtUEZjWFFqVXZwZ2V5WVR2dWl6Zy12bDVsb1ozWE1wck9MZ3N5LXZ5aUtYU3lJVE5PMDdSOFRJeE1yWDU2bUdoMVJyYy1IUQ=='; // Replace with your PayMob API key
+  final String integrationId = '4896403'; // Replace with your Integration ID
+  final String iframeId = '886746'; // Replace with your IFrame ID
   final Dio _dio = Dio();
 
   // Step 1: Authentication request to get auth token
@@ -20,7 +21,11 @@ class PayMobService {
   }
 
   // Step 2: Order registration
-  Future<String> registerOrder(String authToken, double amount, String currency) async {
+  Future<String> registerOrder(
+    String authToken,
+    double amount,
+    String currency,
+  ) async {
     try {
       final response = await _dio.post(
         'https://accept.paymob.com/api/ecommerce/orders',
@@ -85,4 +90,4 @@ class PayMobService {
   String getFinalPaymentUrl(String paymentKey) {
     return 'https://accept.paymob.com/api/acceptance/iframes/886745?payment_token=$paymentKey';
   }
-} 
+}
