@@ -1,11 +1,21 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class PayMobService {
-  final String apiKey =
-      'ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2TVRBeE1URXlOaXdpYm1GdFpTSTZJbWx1YVhScFlXd2lmUS52Wi1WZ2dZWDJucFhrUHdtUEZjWFFqVXZwZ2V5WVR2dWl6Zy12bDVsb1ozWE1wck9MZ3N5LXZ5aUtYU3lJVE5PMDdSOFRJeE1yWDU2bUdoMVJyYy1IUQ=='; // Replace with your PayMob API key
-  final String integrationId = '4896403'; // Replace with your Integration ID
-  final String iframeId = '886746'; // Replace with your IFrame ID
+  late final String apiKey;
+  late final String integrationId;
+  late final String iframeId;
   final Dio _dio = Dio();
+
+  PayMobService() {
+    // Ensure environment variables are loaded
+    if (!dotenv.isInitialized) {
+      throw Exception('Environment variables not loaded. Call await dotenv.load() before creating PayMobService.');
+    }
+    apiKey = dotenv.env['PAYMOB_API_KEY'] ?? '';
+    integrationId = dotenv.env['PAYMOB_INTEGRATION_ID'] ?? '';
+    iframeId = dotenv.env['PAYMOB_IFRAME_ID'] ?? '';
+  }
 
   // Step 1: Authentication request to get auth token
   Future<String> getAuthToken() async {
@@ -88,6 +98,6 @@ class PayMobService {
 
   // Get final payment URL
   String getFinalPaymentUrl(String paymentKey) {
-    return 'https://accept.paymob.com/api/acceptance/iframes/886745?payment_token=$paymentKey';
+    return 'https://accept.paymob.com/api/acceptance/iframes/$iframeId?payment_token=$paymentKey';
   }
 }

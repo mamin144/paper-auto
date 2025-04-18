@@ -51,6 +51,9 @@ dependencies:
   image_picker: ^1.1.2
   flutter_application_1: ^0.0.2
   provider: ^6.1.2
+  pdf: ^3.10.7  # For PDF generation
+  open_file: ^3.3.2  # For opening generated PDFs
+  flutter_dotenv: ^5.1.0  # For loading environment variables
 
 dev_dependencies:
   flutter_test:
@@ -76,8 +79,9 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - .env
     - lib/assets/fas-khan-WJyuzi6EUTs-unsplash.jpg
-    - lib\assets\الشهادات.pdf
+    - lib/assets/الشهادات.pdf
     # - assets/images/
     # - assets/icons/
     # - assets/fonts/
