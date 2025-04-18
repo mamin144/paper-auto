@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:paperauto/services/project_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:paperauto/screens/generate_report.dart';
 
 class MyProjects extends StatefulWidget {
   const MyProjects({super.key});
@@ -157,9 +158,24 @@ class _ProjectCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: onDelete,
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.description, color: Color(0xFF3949AB)),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => GenerateReport(project: project),
+                          ),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: onDelete,
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -7,11 +7,27 @@ import 'package:paperauto/screens/create_project.dart';
 import 'package:paperauto/screens/templates.dart';
 import 'services/firebase_options.dart';
 import 'screens/test_payment_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const MyApp());
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await dotenv.load();  // Remove fileName parameter since .env is the default
+    runApp(const MyApp());
+  } catch (e) {
+    print('Error initializing app: $e');
+    // You might want to show an error screen here
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Text('Error initializing app: $e'),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
