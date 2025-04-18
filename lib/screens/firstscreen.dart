@@ -21,8 +21,8 @@ class PDFViewerPage extends StatelessWidget {
   }
 }
 
-class ScreenOne extends StatelessWidget {
-  const ScreenOne({Key? key}) : super(key: key);
+class Firstscreen extends StatelessWidget {
+  const Firstscreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

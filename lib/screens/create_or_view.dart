@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:paperauto/screens/create_project.dart';
 import 'package:paperauto/widget/HomeDrawer.dart';
 import 'package:paperauto/widget/button.dart';
+import 'package:paperauto/screens/my_projects.dart';
 
 class ScreenOne extends StatelessWidget {
   const ScreenOne({Key? key}) : super(key: key);
@@ -47,7 +48,7 @@ class ScreenOne extends StatelessWidget {
             SizedBox(height: 20),
             WidgetButton(
               text: 'view project',
-              onPressed: () => _navigateTo(context, const ScreenOne()),
+              onPressed: () => _navigateTo(context, const MyProjects()),
             ),
           ],
         ),

@@ -2,8 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:paperauto/screens/firstscreen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:paperauto/services/firebase_options.dart';
+import 'package:paperauto/services/project_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const CreateProject());
 }
 
@@ -54,6 +61,23 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   // Image picker instance
   final ImagePicker _picker = ImagePicker();
 
+  // Form controllers
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _displayNameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _projectNameController = TextEditingController();
+  final TextEditingController _projectAreaController = TextEditingController();
+  final TextEditingController _projectTypeController = TextEditingController();
+  final TextEditingController _villageController = TextEditingController();
+  final TextEditingController _buildingController = TextEditingController();
+  final TextEditingController _mallsController = TextEditingController();
+  final TextEditingController _parkingController = TextEditingController();
+
+  // Project service instance
+  final ProjectService _projectService = ProjectService();
+
   void _goToNextStep() {
     if (_currentStep < _totalSteps - 1) {
       setState(() {
@@ -94,6 +118,82 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         _documentImage = File(pickedImage.path);
       });
     }
+  }
+
+  // Method to save data to Firebase
+  Future<void> _saveProjectData() async {
+    try {
+      // Prepare the data
+      final personalInfo = {
+        'firstName': _firstNameController.text,
+        'lastName': _lastNameController.text,
+        'displayName': _displayNameController.text,
+        'email': _emailController.text,
+        'phone': _phoneController.text,
+      };
+
+      final projectDetails = {
+        'projectName': _projectNameController.text,
+        'projectArea': _projectAreaController.text,
+        'projectType': _projectTypeController.text,
+      };
+
+      final projectDescription = {
+        'village': _villageController.text,
+        'building': _buildingController.text,
+        'malls': _mallsController.text,
+        'parking': _parkingController.text,
+      };
+
+      // Save project using the service
+      await _projectService.createProject(
+        personalInfo: personalInfo,
+        projectDetails: projectDetails,
+        projectDescription: projectDescription,
+        profileImage: _profileImage,
+        documentImage: _documentImage,
+      );
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Project created successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Navigate to next screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const Firstscreen()),
+      );
+    } catch (e) {
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error creating project: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    // Clean up controllers
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _displayNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _projectNameController.dispose();
+    _projectAreaController.dispose();
+    _projectTypeController.dispose();
+    _villageController.dispose();
+    _buildingController.dispose();
+    _mallsController.dispose();
+    _parkingController.dispose();
+    super.dispose();
   }
 
   @override
@@ -282,6 +382,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             // First Name field
             Expanded(
               child: TextField(
+                controller: _firstNameController,
                 decoration: InputDecoration(
                   hintText: 'First Name',
                   hintStyle: TextStyle(color: Colors.grey[400]),
@@ -296,6 +397,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             // Last Name field
             Expanded(
               child: TextField(
+                controller: _lastNameController,
                 decoration: InputDecoration(
                   hintText: 'Last Name',
                   hintStyle: TextStyle(color: Colors.grey[400]),
@@ -313,21 +415,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           icon: Icons.badge,
           label: 'Display Name',
           hintText: 'Name displayed to clients',
+          controller: _displayNameController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.email,
           label: 'Email Address',
           hintText: 'Your professional email',
+          controller: _emailController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.phone,
           label: 'Phone Number',
           hintText: '+20',
+          controller: _phoneController,
         ),
-        // const SizedBox(height: 20),
-        // _buildProfilePictureUpload(),
         const SizedBox(height: 30),
         _buildNavigationButtons(),
       ],
@@ -342,25 +445,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           icon: Icons.work,
           label: 'Project name',
           hintText: ' ما اسم المشروع ',
+          controller: _projectNameController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.business,
           label: 'Project Area',
           hintText: ' ما المنطقة التي يقع فيها المشروع ',
+          controller: _projectAreaController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.location_on,
           label: 'Project Type',
           hintText: ' ما نوع المشروع ',
+          controller: _projectTypeController,
         ),
-        // const SizedBox(height: 20),
-        // _buildFormField(
-        //   icon: Icons.calendar_today,
-        //   label: 'Years of Experience',
-        //   hintText: 'How long have you been practicing law?',
-        // ),
         const SizedBox(height: 30),
         _buildNavigationButtons(),
       ],
@@ -373,26 +473,30 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       children: [
         _buildFormField(
           icon: Icons.villa,
-          label: 'Village',
+          label: 'Villas',
           hintText: 'كم عدد الفلل',
+          controller: _villageController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.house,
           label: 'building ',
           hintText: 'كم عدد المباني',
+          controller: _buildingController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.local_mall,
           label: 'Malls',
           hintText: 'كم عدد المولات',
+          controller: _mallsController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.park,
           label: 'parking',
           hintText: 'كم عدد المواقف',
+          controller: _parkingController,
         ),
         const SizedBox(height: 30),
         _buildFinalStepButtons(),
@@ -484,19 +588,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
         // Submit button
         ElevatedButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ScreenOne()),
-            );
-            // Handle final submission
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('your project has been created successfully!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          },
+          onPressed: _saveProjectData,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF3949AB),
             foregroundColor: Colors.white,
@@ -524,6 +616,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     required IconData icon,
     required String label,
     required String hintText,
+    required TextEditingController controller,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -543,6 +636,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         ),
         const SizedBox(height: 8),
         TextField(
+          controller: controller,
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: TextStyle(color: Colors.grey[400]),
