@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:paperauto/Auth/profile.dart';
 import 'package:paperauto/screens/test_payment_screen.dart';
+import 'package:paperauto/screens/approval_requests_screen.dart';
 
 class HomeDrawer extends StatelessWidget {
   HomeDrawer({Key? key});
@@ -59,6 +60,25 @@ class HomeDrawer extends StatelessWidget {
                   Icon(Icons.notifications, size: 30),
                   SizedBox(width: 3),
                   Text(' Notifications ', style: TextStyle(fontSize: 21)),
+                ],
+              ),
+            ),
+            SizedBox(height: 18),
+
+            // Add Approval Requests button
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ApprovalRequestsScreen()),
+                );
+              },
+              child: Row(
+                children: [
+                  SizedBox(width: 9),
+                  Icon(Icons.approval, size: 30),
+                  SizedBox(width: 3),
+                  Text(' Approval Requests ', style: TextStyle(fontSize: 21)),
                 ],
               ),
             ),

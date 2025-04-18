@@ -3,6 +3,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:paperauto/screens/create_project.dart';
 import 'package:paperauto/widget/HomeDrawer.dart';
 import 'package:paperauto/widget/button.dart';
+import 'package:paperauto/screens/approval_requests_screen.dart';
 
 class PDFViewerPage extends StatelessWidget {
   const PDFViewerPage({Key? key}) : super(key: key);
@@ -35,23 +36,18 @@ class Firstscreen extends StatelessWidget {
           fontWeight: FontWeight.bold,
         ),
         backgroundColor: Color.fromARGB(255, 17, 2, 98),
-        // leading: IconButton(
-        //   // 🔙 AppBar Back Button
-        //   icon: const Icon(Icons.arrow_back),
-        //   onPressed: () {s
-        //     Navigator.pop(context);
-        //   },
-        // ),
-        // actions: [
-        //   // Move Drawer button to the right
-        //   Builder(
-        //     builder:
-        //         (context) => IconButton(
-        //           icon: const Icon(Icons.menu),
-        //           onPressed: () => Scaffold.of(context).openDrawer(),
-        //         ),
-        //   ),
-        // ],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.approval),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ApprovalRequestsScreen()),
+              );
+            },
+            tooltip: 'Approval Requests',
+          ),
+        ],
       ),
       drawer: HomeDrawer(), // Move Drawer to the right side
       body: Center(
@@ -63,6 +59,11 @@ class Firstscreen extends StatelessWidget {
             WidgetButton(
               text: 'mechanical',
               onPressed: () => _navigateTo(context, PDFViewerPage()),
+            ),
+            SizedBox(height: 20),
+            WidgetButton(
+              text: 'Approval Requests',
+              onPressed: () => _navigateTo(context, ApprovalRequestsScreen()),
             ),
           ],
         ),
