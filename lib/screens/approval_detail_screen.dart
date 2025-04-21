@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/mir_data.dart';
+import 'mir_edit_screen.dart';
 
 class ApprovalDetailScreen extends StatelessWidget {
   final String pdfPath;
@@ -28,6 +30,35 @@ class ApprovalDetailScreen extends StatelessWidget {
     } catch (e) {
       debugPrint('Error updating approval status: $e');
       rethrow;
+    }
+  }
+
+  Future<MIRData?> _getMIRData() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('mir_data')
+          .doc(requestId)
+          .get();
+
+      if (doc.exists) {
+        return MIRData.fromMap(doc.data()!);
+      }
+
+      // If no data exists, create initial data
+      final initialData = MIRData(
+        projectName: projectName,
+        contractNo: 'A-17080',
+      );
+
+      await FirebaseFirestore.instance
+          .collection('mir_data')
+          .doc(requestId)
+          .set(initialData.toMap());
+
+      return initialData;
+    } catch (e) {
+      debugPrint('Error getting MIR data: $e');
+      return null;
     }
   }
 
@@ -104,6 +135,27 @@ class ApprovalDetailScreen extends StatelessWidget {
             ),
         ],
       ),
+      floatingActionButton: !isReadOnly
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                final mirData = await _getMIRData();
+                if (mirData != null && context.mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MIREditScreen(
+                        requestId: requestId,
+                        initialData: mirData,
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.edit_document),
+              label: const Text('Edit MIR'),
+              backgroundColor: const Color(0xFF3949AB),
+            )
+          : null,
     );
   }
 } 
