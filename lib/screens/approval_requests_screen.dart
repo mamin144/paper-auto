@@ -85,7 +85,7 @@ class _ApprovalRequestsScreenState extends State<ApprovalRequestsScreen> {
                       icon: const Icon(Icons.visibility),
                       onPressed: () async {
                         try {
-                          final pdfPath = await _reportService.getPdfPath(request['pdfId']);
+                          final pdfPath = await _reportService.getPdfPath(request['pdfId'], request['reportType'] ?? 'mir');
                           if (context.mounted) {
                             Navigator.push(
                               context,
@@ -95,6 +95,7 @@ class _ApprovalRequestsScreenState extends State<ApprovalRequestsScreen> {
                                   requestId: requestId,
                                   projectName: request['projectName'],
                                   isReadOnly: _showSentRequests || status != 'pending',
+                                  isCreator: request['senderEmail'] == FirebaseAuth.instance.currentUser?.email,
                                 ),
                               ),
                             );
