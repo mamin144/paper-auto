@@ -8,6 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/mir_data.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class ReportService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -70,45 +71,60 @@ class ReportService {
         throw Exception('Invalid recipient email');
       }
 
+      // Get recipient user ID
+      final recipientQuery = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: recipientEmail)
+          .get();
+
+      if (recipientQuery.docs.isEmpty) {
+        throw Exception('Recipient not found');
+      }
+
       await _firestore.collection('approval_requests').add({
         'pdfId': pdfId,
-        'reportType': reportType,
+        'reportType': reportType.toLowerCase(),
         'projectName': projectName,
         'senderId': currentUser.uid,
         'senderEmail': currentUser.email,
+        'recipientId': recipientQuery.docs.first.id,
         'recipientEmail': recipientEmail,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       throw Exception('Error creating approval request: $e');
     }
   }
 
-  Future<String> getPdfPath(String pdfId) async {
+  Future<String> getPdfPath(String pdfId, String documentType) async {
     try {
-      // Get PDF data from Firestore
-      final doc = await _firestore.collection('pdfs').doc(pdfId).get();
-      if (!doc.exists) {
-        throw Exception('PDF not found');
+      final dir = await getApplicationDocumentsDirectory();
+      final path = '${dir.path}/$pdfId.pdf';
+      final file = File(path);
+
+      if (await file.exists()) {
+        return path;
       }
 
-      final data = doc.data();
-      if (data == null || !data.containsKey('pdfData')) {
-        throw Exception('Invalid PDF data');
+      // Try to get PDF from Firestore first
+      final pdfDoc = await _firestore.collection('pdfs').doc(pdfId).get();
+      if (pdfDoc.exists) {
+        final pdfData = pdfDoc.data()?['pdfData'] as String?;
+        if (pdfData != null) {
+          final bytes = base64Decode(pdfData);
+          await file.writeAsBytes(bytes);
+          return path;
+        }
       }
 
-      // Convert base64 back to bytes
-      final bytes = base64Decode(data['pdfData'] as String);
-
-      // Save to temporary file
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/$pdfId.pdf');
-      await file.writeAsBytes(bytes);
-
-      return file.path;
+      // If not in Firestore, try Firebase Storage
+      final ref = FirebaseStorage.instance.ref().child('$documentType/$pdfId.pdf');
+      await ref.writeToFile(file);
+      return path;
     } catch (e) {
-      throw Exception('Error retrieving PDF: $e');
+      throw Exception('Error getting PDF: $e');
     }
   }
 

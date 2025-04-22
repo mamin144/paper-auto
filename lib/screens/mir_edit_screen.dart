@@ -3,15 +3,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/mir_data.dart';
 import '../services/report_service.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class MIREditScreen extends StatefulWidget {
   final String requestId;
   final MIRData initialData;
+  final bool isCreator;
 
   const MIREditScreen({
     super.key,
     required this.requestId,
     required this.initialData,
+    required this.isCreator,
   });
 
   @override
@@ -25,8 +28,9 @@ class _MIREditScreenState extends State<MIREditScreen> {
   bool _isPDFVisible = false;
   String? _pdfPath;
   final _reportService = ReportService();
-
-  // Controllers
+  final _recipientController = TextEditingController();
+  final List<String> _recipientEmails = [];
+  final FocusNode _recipientFocusNode = FocusNode();
   final _supplierController = TextEditingController();
   final _manufacturerController = TextEditingController();
   final _countryController = TextEditingController();
@@ -44,6 +48,52 @@ class _MIREditScreenState extends State<MIREditScreen> {
     _boqItems.addAll(_mirData.boqItems);
     if (_boqItems.isEmpty) {
       _addNewBOQItem();
+    }
+    _recipientController.addListener(_handleRecipientInput);
+  }
+
+  @override
+  void dispose() {
+    _recipientController.removeListener(_handleRecipientInput);
+    _recipientController.dispose();
+    _recipientFocusNode.dispose();
+    _supplierController.dispose();
+    _manufacturerController.dispose();
+    _countryController.dispose();
+    _commentsController.dispose();
+    super.dispose();
+  }
+
+  void _handleRecipientInput() {
+    final text = _recipientController.text;
+    if (text.endsWith(',') || text.endsWith(';') || text.endsWith(' ')) {
+      final email = text.substring(0, text.length - 1).trim();
+      if (email.isNotEmpty && _isValidEmail(email)) {
+        setState(() {
+          _recipientEmails.add(email);
+          _recipientController.clear();
+        });
+      }
+    }
+  }
+
+  bool _isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    return emailRegex.hasMatch(email);
+  }
+
+  void _removeRecipient(String email) {
+    setState(() {
+      _recipientEmails.remove(email);
+    });
+  }
+
+  void _addRecipient(String email) {
+    if (email.isNotEmpty && _isValidEmail(email) && !_recipientEmails.contains(email)) {
+      setState(() {
+        _recipientEmails.add(email);
+        _recipientController.clear();
+      });
     }
   }
 
@@ -99,99 +149,6 @@ class _MIREditScreenState extends State<MIREditScreen> {
     }
   }
 
-  Future<void> _saveMIR(bool approved) async {
-    // Remove form validation since we're in PDF preview mode
-    setState(() => _isLoading = true);
-
-    try {
-      // First generate the final PDF with all changes
-      final updatedData = MIRData(
-        projectName: _mirData.projectName,
-        contractNo: _mirData.contractNo,
-        boqItems: _boqItems,
-        masStatus: _mirData.masStatus,
-        dtsStatus: _mirData.dtsStatus,
-        dispatchStatus: _mirData.dispatchStatus,
-        supplierDeliveryNote: _supplierController.text,
-        manufacturer: _manufacturerController.text,
-        countryOfOrigin: _countryController.text,
-        engineerComments: _commentsController.text,
-        isSatisfactory: _mirData.isSatisfactory,
-        dateOfInspection: _mirData.dateOfInspection,
-      );
-
-      // Get the original request to preserve sender information
-      final requestDoc = await FirebaseFirestore.instance
-          .collection('approval_requests')
-          .doc(widget.requestId)
-          .get();
-      
-      if (!requestDoc.exists) {
-        throw Exception('Original approval request not found');
-      }
-
-      final requestData = requestDoc.data()!;
-
-      // Update the MIR data in Firestore first
-      await FirebaseFirestore.instance
-          .collection('mir_data')
-          .doc(widget.requestId)
-          .set(updatedData.toMap());
-
-      // Generate and save the PDF
-      final pdfPath = await _reportService.generatePDFFromMIR(updatedData);
-      
-      // Upload the PDF to storage
-      final pdfId = await _reportService.uploadPDF(pdfPath, 'mir');
-
-      // Update the approval request with the latest status and PDF
-      await FirebaseFirestore.instance
-          .collection('approval_requests')
-          .doc(widget.requestId)
-          .update({
-        'lastUpdated': FieldValue.serverTimestamp(),
-        'mirData': updatedData.toMap(),
-        'status': approved ? 'approved' : 'rejected',
-        'pdfId': pdfId,
-        'reviewerComments': _commentsController.text,
-        // Preserve original sender and recipient information
-        'senderId': requestData['senderId'],
-        'senderEmail': requestData['senderEmail'],
-        'recipientEmail': requestData['recipientEmail'],
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(approved 
-              ? 'MIR approved and sent back to sender' 
-              : 'MIR rejected and sent back to sender'
-            ),
-            backgroundColor: approved ? Colors.green : Colors.red,
-          ),
-        );
-        // Pop twice to go back to the approval requests screen
-        Navigator.of(context)
-          ..pop() // Pop MIREditScreen
-          ..pop(); // Pop ApprovalDetailScreen
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving MIR: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        rethrow; // Re-throw to be caught by the button's error handler
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   void _updateMIRData({
     bool? isSatisfactory,
     String? masStatus,
@@ -234,12 +191,152 @@ class _MIREditScreenState extends State<MIREditScreen> {
     });
   }
 
+  Future<void> _saveMIR(bool approved) async {
+    setState(() => _isLoading = true);
+
+    try {
+      if (widget.isCreator && _recipientEmails.isEmpty) {
+        throw Exception('Please add at least one recipient email');
+      }
+
+      final updatedData = MIRData(
+        projectName: _mirData.projectName,
+        contractNo: _mirData.contractNo,
+        boqItems: _boqItems,
+        masStatus: _mirData.masStatus,
+        dtsStatus: _mirData.dtsStatus,
+        dispatchStatus: _mirData.dispatchStatus,
+        supplierDeliveryNote: _supplierController.text,
+        manufacturer: _manufacturerController.text,
+        countryOfOrigin: _countryController.text,
+        engineerComments: _commentsController.text,
+        isSatisfactory: _mirData.isSatisfactory,
+        dateOfInspection: _mirData.dateOfInspection,
+      );
+
+      // Get the original request to preserve sender information
+      final requestDoc = await FirebaseFirestore.instance
+          .collection('approval_requests')
+          .doc(widget.requestId)
+          .get();
+      
+      if (!requestDoc.exists) {
+        throw Exception('Original approval request not found');
+      }
+
+      final requestData = requestDoc.data()!;
+
+      // Update the MIR data in Firestore first
+      await FirebaseFirestore.instance
+          .collection('mir_data')
+          .doc(widget.requestId)
+          .set(updatedData.toMap());
+
+      // Generate and save the PDF
+      final pdfPath = await _reportService.generatePDFFromMIR(updatedData);
+      
+      // Upload the PDF to storage with correct type
+      final pdfId = await _reportService.uploadPDF(pdfPath, 'mir');
+
+      if (widget.isCreator) {
+        // Get the recipients' user IDs
+        final recipientQuery = await FirebaseFirestore.instance
+            .collection('users')
+            .where('email', whereIn: _recipientEmails)
+            .get();
+
+        if (recipientQuery.docs.isEmpty) {
+          throw Exception('No valid recipients found');
+        }
+
+        // Create a new approval request for each recipient
+        final batch = FirebaseFirestore.instance.batch();
+        final newRequestRef = FirebaseFirestore.instance
+            .collection('approval_requests')
+            .doc();
+
+        batch.set(newRequestRef, {
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'mirData': updatedData.toMap(),
+          'status': 'pending',
+          'pdfId': pdfId,
+          'reviewerComments': '',
+          'senderId': FirebaseAuth.instance.currentUser?.uid,
+          'senderEmail': FirebaseAuth.instance.currentUser?.email,
+          'recipientId': recipientQuery.docs.first.id,
+          'recipientEmail': _recipientEmails.first,
+          'createdAt': FieldValue.serverTimestamp(),
+          'projectName': updatedData.projectName,
+          'reportType': 'mir',
+        });
+
+        await batch.commit();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('MIR sent to ${_recipientEmails.length} recipients'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } else {
+        // If reviewer is editing, update with approval/rejection
+        await FirebaseFirestore.instance
+            .collection('approval_requests')
+            .doc(widget.requestId)
+            .update({
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'mirData': updatedData.toMap(),
+          'status': approved ? 'approved' : 'rejected',
+          'pdfId': pdfId,
+          'reviewerComments': _commentsController.text,
+          'senderId': requestData['recipientId'],
+          'senderEmail': requestData['recipientEmail'],
+          'recipientEmail': requestData['senderEmail'],
+          'projectName': updatedData.projectName,
+          'reportType': 'mir',
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(approved 
+                ? 'MIR approved and sent back to creator' 
+                : 'MIR rejected and sent back to creator'
+              ),
+              backgroundColor: approved ? Colors.green : Colors.red,
+            ),
+          );
+          Navigator.of(context)
+            ..pop() // Pop MIREditScreen
+            ..pop(); // Pop ApprovalDetailScreen
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving MIR: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        rethrow;
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF3949AB),
-        title: const Text('Edit Material Inspection Request'),
+        title: Text(widget.isCreator ? 'Edit Material Inspection Request' : 'Review Material Inspection Request'),
         actions: [
           if (_isLoading)
             const Center(
@@ -260,17 +357,24 @@ class _MIREditScreenState extends State<MIREditScreen> {
           ? Column(
               children: [
                 Expanded(
-                  child: PDFView(
-                    filePath: _pdfPath!,
-                    enableSwipe: true,
-                    swipeHorizontal: false,
-                    autoSpacing: false,
-                    pageFling: false,
-                    pageSnap: true,
-                    defaultPage: 0,
-                    fitPolicy: FitPolicy.BOTH,
-                    preventLinkNavigation: false,
-                  ),
+                  child: _pdfPath!.isNotEmpty
+                      ? PDFView(
+                          filePath: _pdfPath!,
+                          enableSwipe: true,
+                          swipeHorizontal: false,
+                          autoSpacing: false,
+                          pageFling: false,
+                          pageSnap: true,
+                          defaultPage: 0,
+                          fitPolicy: FitPolicy.BOTH,
+                          preventLinkNavigation: false,
+                        )
+                      : const Center(
+                          child: Text(
+                            'PDF not available',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
                 ),
                 Container(
                   decoration: BoxDecoration(
@@ -286,94 +390,208 @@ class _MIREditScreenState extends State<MIREditScreen> {
                   child: SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
+                      child: Column(
                         children: [
-                          if (!_isLoading) ...[
-                            SizedBox(
-                              height: 48,
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  setState(() => _isLoading = true);
-                                  try {
-                                    await _saveMIR(true);
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Error: $e'),
-                                          backgroundColor: Colors.red,
+                          if (widget.isCreator) ...[
+                            const Text(
+                              'Recipients',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.all(8),
+                              child: Column(
+                                children: [
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: _recipientEmails.map((email) => Chip(
+                                      label: Text(email),
+                                      deleteIcon: const Icon(Icons.close, size: 18),
+                                      onDeleted: () => _removeRecipient(email),
+                                      backgroundColor: const Color(0xFF3949AB).withOpacity(0.1),
+                                    )).toList(),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: _recipientController,
+                                          focusNode: _recipientFocusNode,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Type email and press Enter or add comma',
+                                            border: InputBorder.none,
+                                            contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                                          ),
+                                          keyboardType: TextInputType.emailAddress,
+                                          onSubmitted: (value) {
+                                            _addRecipient(value);
+                                          },
                                         ),
-                                      );
-                                    }
-                                  } finally {
-                                    if (mounted) {
-                                      setState(() => _isLoading = false);
-                                    }
-                                  }
-                                },
-                                icon: const Icon(Icons.check, color: Colors.white),
-                                label: const Text('Approve Changes'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.add_circle_outline),
+                                        onPressed: () {
+                                          _addRecipient(_recipientController.text);
+                                        },
+                                        tooltip: 'Add recipient',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Press Enter or add comma to add recipient',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              if (!_isLoading) ...[
+                                if (!widget.isCreator) ...[
+                                  SizedBox(
+                                    height: 48,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        setState(() => _isLoading = true);
+                                        try {
+                                          await _saveMIR(true);
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
+                                          }
+                                        }
+                                      },
+                                      icon: const Icon(Icons.check, color: Colors.white),
+                                      label: const Text('Approve Changes'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: 48,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        setState(() => _isLoading = true);
+                                        try {
+                                          await _saveMIR(false);
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
+                                          }
+                                        }
+                                      },
+                                      icon: const Icon(Icons.close, color: Colors.white),
+                                      label: const Text('Reject Changes'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                                      ),
+                                    ),
+                                  ),
+                                ] else ...[
+                                  SizedBox(
+                                    height: 48,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        if (_recipientEmails.isEmpty) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Please add at least one recipient'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        setState(() => _isLoading = true);
+                                        try {
+                                          await _saveMIR(true);
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
+                                          }
+                                        }
+                                      },
+                                      icon: const Icon(Icons.save, color: Colors.white),
+                                      label: const Text('Save Changes'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF3949AB),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                SizedBox(
+                                  height: 48,
+                                  child: TextButton.icon(
+                                    onPressed: !_isLoading 
+                                      ? () => setState(() => _isPDFVisible = false)
+                                      : null,
+                                    icon: const Icon(Icons.edit),
+                                    label: const Text('Back to Edit'),
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            SizedBox(
-                              height: 48,
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  setState(() => _isLoading = true);
-                                  try {
-                                    await _saveMIR(false);
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Error: $e'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  } finally {
-                                    if (mounted) {
-                                      setState(() => _isLoading = false);
-                                    }
-                                  }
-                                },
-                                icon: const Icon(Icons.close, color: Colors.white),
-                                label: const Text('Reject Changes'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                              ] else
+                                const SizedBox(
+                                  height: 48,
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            SizedBox(
-                              height: 48,
-                              child: TextButton.icon(
-                                onPressed: !_isLoading 
-                                  ? () => setState(() => _isPDFVisible = false)
-                                  : null,
-                                icon: const Icon(Icons.edit),
-                                label: const Text('Back to Edit'),
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                                ),
-                              ),
-                            ),
-                          ] else
-                            const SizedBox(
-                              height: 48,
-                              child: Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -802,14 +1020,5 @@ class _MIREditScreenState extends State<MIREditScreen> {
               ),
             ),
     );
-  }
-
-  @override
-  void dispose() {
-    _supplierController.dispose();
-    _manufacturerController.dispose();
-    _countryController.dispose();
-    _commentsController.dispose();
-    super.dispose();
   }
 } 

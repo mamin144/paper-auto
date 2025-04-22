@@ -2,13 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:paperauto/services/report_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
+import '../models/mir_data.dart';
+import '../screens/mir_edit_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class GenerateReport extends StatefulWidget {
   final Map<String, dynamic> project;
+  final bool isEditMode;
+  final String? requestId;
+  final bool isCreator;
 
   const GenerateReport({
     super.key,
     required this.project,
+    this.isEditMode = false,
+    this.requestId,
+    this.isCreator = false,
   });
 
   @override
@@ -20,13 +31,36 @@ class _GenerateReportState extends State<GenerateReport> {
   final _recipientController = TextEditingController();
   bool _isGenerating = false;
   bool _isSending = false;
+  bool _isPDFVisible = false;
   String? _error;
   String? _lastGeneratedPath;
   String? _lastGeneratedType;
+  String? _pdfPath;
+  String? _currentRequestId;
 
   @override
   void initState() {
     super.initState();
+    _currentRequestId = widget.requestId;
+    if (widget.isEditMode) {
+      _loadExistingPDF();
+    }
+  }
+
+  Future<void> _loadExistingPDF() async {
+    try {
+      if (_currentRequestId != null) {
+        final pdfPath = await _reportService.getPdfPath(_currentRequestId!, _lastGeneratedType ?? 'mir');
+        setState(() {
+          _pdfPath = pdfPath;
+          _isPDFVisible = true;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Error loading PDF: $e';
+      });
+    }
   }
 
   Future<void> _generateReport(String type) async {
@@ -43,12 +77,26 @@ class _GenerateReportState extends State<GenerateReport> {
         filePath = await _reportService.generateIR(widget.project);
       }
 
+      // If this is a new report (not edit mode), create a new request ID
+      if (!widget.isEditMode) {
+        final docRef = await FirebaseFirestore.instance.collection('approval_requests').add({
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'status': 'pending',
+          'projectName': widget.project['projectDetails']['projectName'] ?? 'Untitled Project',
+          'reportType': type.toLowerCase(),
+          'senderId': FirebaseAuth.instance.currentUser?.uid,
+          'senderEmail': FirebaseAuth.instance.currentUser?.email,
+        });
+        _currentRequestId = docRef.id;
+      }
+
       setState(() {
         _lastGeneratedPath = filePath;
         _lastGeneratedType = type;
+        _pdfPath = filePath;
+        _isPDFVisible = true;
       });
-
-      await _reportService.openPDF(filePath);
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -60,82 +108,125 @@ class _GenerateReportState extends State<GenerateReport> {
     }
   }
 
-  Future<void> _sharePDF() async {
-    if (_lastGeneratedPath == null) {
-      setState(() {
-        _error = 'Please generate a report first';
-      });
-      return;
-    }
+  Future<void> _saveChanges() async {
+    if (_lastGeneratedPath == null || _lastGeneratedType == null || _currentRequestId == null) return;
 
     try {
-      await Share.shareXFiles(
-        [XFile(_lastGeneratedPath!)],
-        text: 'Please review and approve this ${widget.project['projectDetails']['projectName']} report',
-      );
+      setState(() => _isSending = true);
+
+      // Upload the updated PDF
+      final pdfId = await _reportService.uploadPDF(_lastGeneratedPath!, _lastGeneratedType!);
+
+      if (widget.isEditMode) {
+        // Update existing approval request
+        await FirebaseFirestore.instance
+            .collection('approval_requests')
+            .doc(_currentRequestId)
+            .update({
+          'pdfId': pdfId,
+          'status': 'pending',
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'recipientEmail': _recipientController.text.trim(),
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Report updated and sent for approval'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } else {
+        // Create new approval request
+        await _reportService.requestApproval(
+          pdfId: pdfId,
+          reportType: _lastGeneratedType!,
+          projectName: widget.project['projectDetails']['projectName'],
+          recipientEmail: _recipientController.text.trim(),
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Approval request sent successfully')),
+          );
+          Navigator.of(context).pop();
+        }
+      }
     } catch (e) {
       setState(() {
-        _error = 'Error sharing file: $e';
+        _error = e.toString();
+      });
+    } finally {
+      setState(() {
+        _isSending = false;
       });
     }
   }
 
-  Future<void> _sendForApproval() async {
-    if (_lastGeneratedPath == null || _lastGeneratedType == null) {
-      setState(() {
-        _error = 'Please generate a report first';
-      });
-      return;
-    }
-
-    if (_recipientController.text.isEmpty) {
-      setState(() {
-        _error = 'Please enter recipient email';
-      });
+  Future<void> _navigateToMIREdit() async {
+    if (_currentRequestId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No request ID found. Please generate a report first.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
     try {
-      setState(() {
-        _isSending = true;
-        _error = null;
-      });
+      // Get the MIR data from Firestore
+      final mirDoc = await FirebaseFirestore.instance
+          .collection('mir_data')
+          .doc(_currentRequestId)
+          .get();
 
-      // Validate file exists
-      final file = File(_lastGeneratedPath!);
-      if (!await file.exists()) {
-        throw Exception('Generated PDF file not found. Please generate the report again.');
-      }
-
-      // Upload PDF to Firestore
-      final pdfId = await _reportService.uploadPDF(_lastGeneratedPath!, _lastGeneratedType!);
-
-      // Create approval request
-      await _reportService.requestApproval(
-        pdfId: pdfId,
-        reportType: _lastGeneratedType!,
-        projectName: widget.project['projectDetails']['projectName'],
-        recipientEmail: _recipientController.text.trim(),
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Approval request sent successfully')),
+      if (mirDoc.exists) {
+        final mirData = MIRData.fromMap(mirDoc.data()!);
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MIREditScreen(
+                requestId: _currentRequestId!,
+                initialData: mirData,
+                isCreator: widget.isCreator,
+              ),
+            ),
+          );
+        }
+      } else {
+        // If no MIR data exists, create initial data
+        final initialData = MIRData(
+          projectName: widget.project['projectDetails']['projectName'],
+          contractNo: widget.project['projectDetails']['contractNo'] ?? 'A-17080',
         );
-        // Clear the recipient field
-        _recipientController.clear();
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MIREditScreen(
+                requestId: _currentRequestId!,
+                initialData: initialData,
+                isCreator: widget.isCreator,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _error = e.toString();
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSending = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading MIR data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -145,105 +236,160 @@ class _GenerateReportState extends State<GenerateReport> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF3949AB),
-        title: const Text('Generate Report'),
+        title: Text(widget.isEditMode ? 'Edit Report' : 'Generate Report'),
         actions: [
-          if (_lastGeneratedPath != null)
+          if (_isGenerating)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+            )
+          else if (!_isPDFVisible)
             IconButton(
-              icon: const Icon(Icons.share),
-              onPressed: _sharePDF,
-              tooltip: 'Share for Approval',
+              icon: const Icon(Icons.preview),
+              onPressed: () => _generateReport('MIR'),
+              tooltip: 'Preview PDF',
             ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Select Report Type',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _isGenerating
-                  ? null
-                  : () => _generateReport('MIR'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3949AB),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: _isGenerating
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
-                      'Generate Monthly Inspection Report (MIR)',
-                      style: TextStyle(fontSize: 16),
-                    ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _isGenerating
-                  ? null
-                  : () => _generateReport('IR'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3949AB),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: _isGenerating
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
-                      'Generate Inspection Report (IR)',
-                      style: TextStyle(fontSize: 16),
-                    ),
-            ),
-            if (_lastGeneratedPath != null) ...[
-              const SizedBox(height: 32),
-              const Text(
-                'Send for Approval',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+      body: _isPDFVisible && _pdfPath != null
+          ? Column(
+              children: [
+                Expanded(
+                  child: PDFView(
+                    filePath: _pdfPath!,
+                    enableSwipe: true,
+                    swipeHorizontal: false,
+                    autoSpacing: false,
+                    pageFling: false,
+                    pageSnap: true,
+                    defaultPage: 0,
+                    fitPolicy: FitPolicy.BOTH,
+                    preventLinkNavigation: false,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _recipientController,
-                decoration: const InputDecoration(
-                  labelText: 'Recipient Email',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _isSending ? null : _sendForApproval,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3949AB),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isSending
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Send for Approval',
-                        style: TextStyle(fontSize: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, -2),
                       ),
-              ),
-            ],
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Text(
-                  'Error: $_error',
-                  style: const TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
+                    ],
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          if (!widget.isEditMode) ...[
+                            TextField(
+                              controller: _recipientController,
+                              decoration: const InputDecoration(
+                                labelText: 'Recipient Email',
+                                border: OutlineInputBorder(),
+                                hintText: 'Enter email of the person to review',
+                              ),
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              if (!_isSending) ...[
+                                SizedBox(
+                                  height: 48,
+                                  child: ElevatedButton.icon(
+                                    onPressed: _saveChanges,
+                                    icon: const Icon(Icons.save, color: Colors.white),
+                                    label: const Text('Save Changes'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF3949AB),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  height: 48,
+                                  child: TextButton.icon(
+                                    onPressed: !_isSending ? _navigateToMIREdit : null,
+                                    icon: const Icon(Icons.edit),
+                                    label: const Text('Edit MIR'),
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                                    ),
+                                  ),
+                                ),
+                              ] else
+                                const SizedBox(
+                                  height: 48,
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+              ],
+            )
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Select Report Type',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _isGenerating
+                        ? null
+                        : () => _generateReport('MIR'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3949AB),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _isGenerating
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Generate Monthly Inspection Report (MIR)',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _isGenerating
+                        ? null
+                        : () => _generateReport('IR'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3949AB),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _isGenerating
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Generate Inspection Report (IR)',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                  ),
+                ],
               ),
-          ],
-        ),
-      ),
+            ),
     );
   }
 } 

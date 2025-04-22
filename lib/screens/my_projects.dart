@@ -166,7 +166,10 @@ class _ProjectCard extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => GenerateReport(project: project),
+                            builder: (context) => GenerateReport(
+                              project: project,
+                              isCreator: true,
+                            ),
                           ),
                         );
                       },
