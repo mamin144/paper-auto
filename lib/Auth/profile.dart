@@ -7,104 +7,176 @@ import 'package:paperauto/widget/profilee.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(ProfileApp());
+  runApp(const ProfileApp());
 }
 
 class ProfileApp extends StatelessWidget {
+  const ProfileApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Professional Profile',
+      title: 'Paper Automation Profile',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.grey[200],
+        primaryColor: const Color(0xFF1A237E),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1A237E),
+          primary: const Color(0xFF1A237E),
+        ),
+        scaffoldBackgroundColor: Colors.grey[100], // Lighter background
       ),
-      home: ProfileScreen(),
+      home: const ProfileScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
 class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Profile", style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF1A237E),
+        elevation: 0,
+        title: const Text(
+          "Profile",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
-        backgroundColor: Color.fromARGB(255, 17, 2, 98),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: ProfilePageState(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Navigate to profile edit page
-          print("Edit Profile Clicked");
-        },
-        child: Icon(Icons.edit, size: 28, color: Colors.white),
-        backgroundColor: Color.fromARGB(255, 17, 2, 98),
+      body: Container(
+        // Apply gradient background
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF1A237E).withOpacity(0.1),
+              const Color(0xFF3949AB).withOpacity(0.1),
+            ],
+          ),
+        ),
+        child: const ProfilePageContent(), // Renamed from ProfilePageState
       ),
     );
   }
 }
 
-class ProfilePageState extends StatefulWidget {
+class ProfilePageContent extends StatefulWidget {
+  const ProfilePageContent({super.key});
+
   @override
-  _ProfilePageStateState createState() => _ProfilePageStateState();
+  State<ProfilePageContent> createState() => _ProfilePageContentState();
 }
 
-class _ProfilePageStateState extends State<ProfilePageState> {
-  late String email = 'Loading...';
-  late String name = 'Loading...';
-  late String profilePicture = '';
-  late String phoneNumber = '';
+class _ProfilePageContentState extends State<ProfilePageContent> {
+  late Future<Map<String, dynamic>> _userDataFuture;
 
   @override
   void initState() {
     super.initState();
-    fetchData();
+    _userDataFuture = fetchData();
   }
 
-  Future<void> fetchData() async {
+  Future<Map<String, dynamic>> fetchData() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-
-      if (user != null) {
-        FirebaseFirestore firestore = FirebaseFirestore.instance;
-        DocumentSnapshot documentSnapshot =
-            await firestore.collection('users').doc(user.uid).get();
-        if (documentSnapshot.exists) {
-          Map<String, dynamic> data =
-              documentSnapshot.data() as Map<String, dynamic>;
-          setState(() {
-            email = data['email'] ?? 'No Email';
-            name = data['First name'] ?? 'No Name';
-            profilePicture = data['profilePicture'] ?? '';
-            phoneNumber = data['phone number'] ?? 'No Phone Number';
-          });
-        } else {
-          print('Document does not exist');
-        }
+      DocumentSnapshot documentSnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+      if (documentSnapshot.exists) {
+        return documentSnapshot.data() as Map<String, dynamic>;
       } else {
-        print('User not logged in');
+        throw Exception('User data not found');
       }
-    } catch (e, stackTrace) {
-      print('Error in fetchData: $e');
-      print(stackTrace);
+    } catch (e) {
+      debugPrint('Error fetching user data: $e');
+      rethrow; // Rethrow to be caught by FutureBuilder
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: ProfessionalProfileWidget(
-        profilePicture: profilePicture,
-        name: name,
-        email: email,
-        phoneNumber: phoneNumber,
-      ),
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _userDataFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1A237E)),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading profile: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _userDataFuture = fetchData(); // Retry fetching
+                      });
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A237E),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('No profile data found.'));
+        }
+
+        final userData = snapshot.data!;
+        final email = userData['email'] ?? 'No Email';
+        final name = userData['First name'] ?? 'No Name';
+        final profilePicture = userData['profilePicture'] ?? '';
+        final phoneNumber = userData['phone number'] ?? 'No Phone Number';
+
+        // Use SingleChildScrollView to allow content to scroll if it overflows
+        return SingleChildScrollView(
+          child: ProfessionalProfileWidget(
+            profilePicture: profilePicture,
+            name: name,
+            email: email,
+            phoneNumber: phoneNumber,
+          ),
+        );
+      },
     );
   }
 }
@@ -116,103 +188,134 @@ class ProfessionalProfileWidget extends StatelessWidget {
   final String phoneNumber;
 
   const ProfessionalProfileWidget({
-    Key? key,
+    super.key, // Use super parameter
     required this.profilePicture,
     required this.name,
     required this.email,
     required this.phoneNumber,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: Card(
-        elevation: 6,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
-          child: Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Profile Picture
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(60),
-                  child:
-                      profilePicture.isNotEmpty
-                          ? Image.network(
-                            profilePicture,
-                            width: 120,
-                            height: 120,
-                            fit: BoxFit.cover,
-                          )
-                          : Icon(
-                            Icons.account_circle,
-                            size: 120,
-                            color: Colors.grey,
-                          ),
-                ),
-                const SizedBox(height: 20),
-
-                // Name
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+      child: Column(
+        children: [
+          Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Profile Picture
+                  CircleAvatar(
+                    radius: 60,
+                    backgroundColor: const Color(0xFF1A237E).withOpacity(0.1),
+                    backgroundImage:
+                        profilePicture.isNotEmpty
+                            ? NetworkImage(profilePicture)
+                            : null,
+                    child:
+                        profilePicture.isEmpty
+                            ? const Icon(
+                              Icons.account_circle,
+                              size: 80,
+                              color: Color(0xFF1A237E),
+                            )
+                            : null,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 10),
+                  const SizedBox(height: 20),
 
-                // Email
-                ListTile(
-                  leading: Icon(Icons.email, color: Colors.blueAccent),
-                  title: Text(
-                    email,
-                    style: TextStyle(fontSize: 16),
-                    // textAlign: TextAlign.center,
-                  ),
-                ),
-
-                // Phone Number
-                ListTile(
-                  leading: Icon(Icons.phone, color: Colors.green),
-                  title: Text(
-                    '+20 ' + phoneNumber,
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Edit Button
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: Add edit profile functionality
-                    print("Edit Profile Clicked");
-                  },
-                  icon: Icon(Icons.edit, color: Colors.white),
-                  label: Text("Edit Profile"),
-                  style: ElevatedButton.styleFrom(
-                    textStyle: const TextStyle(
-                      fontSize: 18,
-                      color: Colors.white,
+                  // Name
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A237E),
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    backgroundColor: Color.fromARGB(255, 17, 2, 98),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-                Expanded(child: SettingsFragment()),
-              ],
+                  const SizedBox(height: 10),
+
+                  // Email
+                  _buildInfoTile(
+                    icon: Icons.email_outlined,
+                    text: email,
+                    iconColor: Colors.blueAccent,
+                  ),
+
+                  // Phone Number
+                  _buildInfoTile(
+                    icon: Icons.phone_outlined,
+                    text:
+                        phoneNumber != 'No Phone Number'
+                            ? '+20 $phoneNumber'
+                            : phoneNumber,
+                    iconColor: Colors.green,
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // Edit Button
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // TODO: Navigate to profile edit page
+                      debugPrint("Navigate to Edit Profile Screen");
+                    },
+                    icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                    label: const Text("Edit Profile"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A237E),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 30,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
+          const SizedBox(height: 20),
+          // Settings Section (consider moving this to a separate navigation)
+          Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: SettingsFragment(), // From profilee.dart
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildInfoTile({
+    required IconData icon,
+    required String text,
+    required Color iconColor,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: iconColor, size: 24),
+      title: Text(
+        text,
+        style: const TextStyle(fontSize: 16, color: Colors.black87),
+      ),
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
     );
   }
 }

@@ -4,7 +4,7 @@ import 'package:paperauto/screens/test_payment_screen.dart';
 import 'package:paperauto/screens/approval_requests_screen.dart';
 
 class HomeDrawer extends StatelessWidget {
-  HomeDrawer({Key? key});
+  const HomeDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,144 +14,141 @@ class HomeDrawer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // # category
             Container(
-              padding: EdgeInsets.symmetric(vertical: 15, horizontal: 15),
-              alignment: Alignment.center,
-              color: Color.fromARGB(255, 17, 2, 98),
-              child: Text(
-                '\n Automation Paper \n  ',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 33,
-                  fontWeight: FontWeight.bold,
+              height: 200,
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
               ),
-            ),
-
-            SizedBox(height: 25),
-
-            // first category
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ProfileScreen()),
-                );
-              },
-              child: Row(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(width: 9),
-                  Icon(Icons.account_circle, size: 30),
-                  SizedBox(width: 3),
-                  Text(' My Profile ', style: TextStyle(fontSize: 21)),
-                ],
-              ),
-            ),
-            SizedBox(height: 18),
-
-            TextButton(
-              onPressed: () {
-                // Handle Notifications button press
-              },
-              child: Row(
-                children: [
-                  SizedBox(width: 9),
-                  Icon(Icons.notifications, size: 30),
-                  SizedBox(width: 3),
-                  Text(' Notifications ', style: TextStyle(fontSize: 21)),
-                ],
-              ),
-            ),
-            SizedBox(height: 18),
-
-            // Add Approval Requests button
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ApprovalRequestsScreen()),
-                );
-              },
-              child: Row(
-                children: [
-                  SizedBox(width: 9),
-                  Icon(Icons.approval, size: 30),
-                  SizedBox(width: 3),
-                  Text(' Approval Requests ', style: TextStyle(fontSize: 21)),
-                ],
-              ),
-            ),
-            SizedBox(height: 18),
-
-            Divider(
-              color: const Color.fromARGB(255, 158, 158, 158),
-              thickness: 1,
-            ),
-            SizedBox(height: 22),
-
-            // second category
-            TextButton(
-              onPressed: () {
-                // Navigator.push(
-                //   context,
-                //   MaterialPageRoute(builder: (context) => ProfileScreen()),
-                // );
-              },
-              child: Row(
-                children: [
-                  SizedBox(width: 9),
-                  Icon(Icons.settings, size: 30),
-                  SizedBox(width: 3),
-                  Text(' Settings ', style: TextStyle(fontSize: 21)),
-                ],
-              ),
-            ),
-            SizedBox(height: 18),
-
-            TextButton(
-              onPressed: () {},
-              child: Row(
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TestPaymentScreen(),
-                        ),
-                      );
-                    },
-                    child: Row(
-                      children: [
-                        Icon(Icons.attach_money_outlined, size: 30),
-
-                        Text('Payment Method ', style: TextStyle(fontSize: 21)),
-                      ],
+                  const CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.description,
+                      size: 40,
+                      color: Color(0xFF1A237E),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  const Text(
+                    'Paper Automation',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 18),
-
-            TextButton(
-              onPressed: () {
-                // Handle Rate App button press
-              },
-              child: Row(
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
                 children: [
-                  SizedBox(width: 9),
-                  Icon(Icons.star, size: 30),
-                  SizedBox(width: 3),
-                  Text(' Rate App ! ', style: TextStyle(fontSize: 21)),
+                  _buildDrawerItem(
+                    icon: Icons.account_circle_outlined,
+                    text: 'My Profile',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProfileScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.notifications_outlined,
+                    text: 'Notifications',
+                    onTap: () {
+                      // Handle Notifications button press
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.approval_outlined,
+                    text: 'Approval Requests',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ApprovalRequestsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  _buildDrawerItem(
+                    icon: Icons.settings_outlined,
+                    text: 'Settings',
+                    onTap: () {
+                      // Handle Settings button press
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.payment_outlined,
+                    text: 'Payment Method',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TestPaymentScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.star_outline,
+                    text: 'Rate App',
+                    onTap: () {
+                      // Handle Rate App button press
+                    },
+                  ),
+                  const Divider(height: 1),
+                  _buildDrawerItem(
+                    icon: Icons.logout,
+                    text: 'Log Out',
+                    color: Colors.red,
+                    onTap: () {
+                      // Handle Log Out button press
+                      // e.g., FirebaseAuth.instance.signOut();
+                    },
+                  ),
                 ],
               ),
             ),
-            SizedBox(height: 18),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? const Color(0xFF1A237E), size: 26),
+      title: Text(
+        text,
+        style: TextStyle(
+          fontSize: 16,
+          color: color ?? Colors.black87,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      visualDensity: VisualDensity.compact,
     );
   }
 }

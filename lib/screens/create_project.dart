@@ -8,9 +8,7 @@ import 'package:paperauto/services/project_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const CreateProject());
 }
 
@@ -22,17 +20,21 @@ class CreateProject extends StatelessWidget {
     return MaterialApp(
       title: 'Paper Automation',
       theme: ThemeData(
-        primaryColor: const Color(0xFF3949AB),
+        primaryColor: const Color(0xFF1A237E),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3949AB),
-          primary: const Color(0xFF3949AB),
+          seedColor: const Color(0xFF1A237E),
+          primary: const Color(0xFF1A237E),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF1A237E), width: 2),
           ),
         ),
       ),
@@ -200,47 +202,65 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF3949AB),
-        title: const Text('Paper Automation'),
+        backgroundColor: const Color(0xFF1A237E),
+        title: const Text(
+          'Create New Project',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: _currentStep > 0 ? _goToPreviousStep : null,
         ),
+        elevation: 0,
       ),
       body: Container(
-        color: const Color(0xFF3949AB),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF1A237E).withOpacity(0.9),
+              const Color(0xFF3949AB).withOpacity(0.9),
+            ],
+          ),
+        ),
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // Logo - now using profile image if available
             GestureDetector(
               onTap: _pickProfileImage,
               child: Column(
                 children: [
                   const Text(
-                    'Click to upload profile image',
+                    'Upload Project Image',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFF5C6BC0),
-                    radius: 40,
-                    backgroundImage:
-                        _profileImage != null
-                            ? FileImage(_profileImage!)
-                            : null,
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
                     child:
-                        _profileImage == null
-                            ? Icon(
-                              Icons.gavel,
+                        _profileImage != null
+                            ? ClipOval(
+                              child: Image.file(
+                                _profileImage!,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                            : Icon(
+                              Icons.add_a_photo,
                               size: 40,
                               color: Colors.white.withOpacity(0.8),
-                            )
-                            : null,
+                            ),
                   ),
                 ],
               ),
@@ -249,31 +269,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
-                  'Tap to change',
+                  'Tap to change image',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
-                    fontSize: 12,
+                    fontSize: 14,
                   ),
                 ),
               ),
-            const SizedBox(height: 20),
-            // Title
+            const SizedBox(height: 24),
             const Text(
-              'Join Our Network of Legal Professionals',
+              'Create Your Project',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 10),
-            // Subtitle
+            const SizedBox(height: 8),
             const Text(
-              'Complete the form to start connecting with Engineers',
-              style: TextStyle(color: Colors.white, fontSize: 14),
+              'Fill in the details to get started',
+              style: TextStyle(color: Colors.white70, fontSize: 16),
             ),
             const SizedBox(height: 24),
-            // Steps indicator
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -285,11 +302,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            // Form
             Expanded(
               child: Container(
                 decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
+                  color: Colors.white,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(30),
                     topRight: Radius.circular(30),
@@ -313,31 +329,43 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     return Column(
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor:
-              isActive
-                  ? const Color(0xFF3949AB)
-                  : isCompleted
-                  ? Colors.green
-                  : Colors.grey.withOpacity(0.3),
-          child:
-              isCompleted
-                  ? const Icon(Icons.check, color: Colors.white, size: 16)
-                  : Text(
-                    '${step + 1}',
-                    style: TextStyle(
-                      color: isActive ? Colors.white : Colors.grey,
-                      fontWeight: FontWeight.bold,
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color:
+                isActive
+                    ? Colors.white
+                    : isCompleted
+                    ? Colors.green
+                    : Colors.white.withOpacity(0.3),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isActive ? const Color(0xFF1A237E) : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: Center(
+            child:
+                isCompleted
+                    ? const Icon(Icons.check, color: Colors.white, size: 20)
+                    : Text(
+                      '${step + 1}',
+                      style: TextStyle(
+                        color: isActive ? const Color(0xFF1A237E) : Colors.grey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           label,
           style: TextStyle(
             color: isActive ? Colors.white : Colors.white.withOpacity(0.7),
-            fontSize: 12,
+            fontSize: 14,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ],
@@ -361,54 +389,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Name row label
-        Row(
-          children: [
-            Icon(Icons.person, color: Colors.grey[600], size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'Name',
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        // First and Last Name in one row
-        Row(
-          children: [
-            // First Name field
-            Expanded(
-              child: TextField(
-                controller: _firstNameController,
-                decoration: InputDecoration(
-                  hintText: 'First Name',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            // Last Name field
-            Expanded(
-              child: TextField(
-                controller: _lastNameController,
-                decoration: InputDecoration(
-                  hintText: 'Last Name',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-            ),
-          ],
+        _buildFormField(
+          icon: Icons.person,
+          label: 'Name',
+          hintText: 'Enter your full name',
+          controller: _firstNameController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
@@ -444,21 +429,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         _buildFormField(
           icon: Icons.work,
           label: 'Project name',
-          hintText: ' ما اسم المشروع ',
+          hintText: 'Enter project name',
           controller: _projectNameController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.business,
           label: 'Project Area',
-          hintText: ' ما المنطقة التي يقع فيها المشروع ',
+          hintText: 'Enter project area',
           controller: _projectAreaController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.location_on,
           label: 'Project Type',
-          hintText: ' ما نوع المشروع ',
+          hintText: 'Enter project type',
           controller: _projectTypeController,
         ),
         const SizedBox(height: 30),
@@ -474,28 +459,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         _buildFormField(
           icon: Icons.villa,
           label: 'Villas',
-          hintText: 'كم عدد الفلل',
+          hintText: 'Enter number of villas',
           controller: _villageController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.house,
-          label: 'building ',
-          hintText: 'كم عدد المباني',
+          label: 'Buildings',
+          hintText: 'Enter number of buildings',
           controller: _buildingController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.local_mall,
           label: 'Malls',
-          hintText: 'كم عدد المولات',
+          hintText: 'Enter number of malls',
           controller: _mallsController,
         ),
         const SizedBox(height: 20),
         _buildFormField(
           icon: Icons.park,
-          label: 'parking',
-          hintText: 'كم عدد المواقف',
+          label: 'Parking',
+          hintText: 'Enter number of parking spaces',
           controller: _parkingController,
         ),
         const SizedBox(height: 30),
@@ -508,16 +493,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Back button
         ElevatedButton(
           onPressed: _currentStep > 0 ? _goToPreviousStep : null,
           style: ElevatedButton.styleFrom(
             backgroundColor:
-                _currentStep > 0 ? Colors.grey[300] : Colors.grey[200],
+                _currentStep > 0 ? Colors.grey[200] : Colors.grey[100],
             foregroundColor:
                 _currentStep > 0 ? Colors.black87 : Colors.grey[400],
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(12),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
@@ -532,15 +516,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             ],
           ),
         ),
-
-        // Next button
         ElevatedButton(
           onPressed: _goToNextStep,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color.fromARGB(255, 17, 2, 98),
+            backgroundColor: const Color(0xFF1A237E),
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(12),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
@@ -563,14 +545,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Back button
         ElevatedButton(
           onPressed: _goToPreviousStep,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[300],
+            backgroundColor: Colors.grey[200],
             foregroundColor: Colors.black87,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(12),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
@@ -585,15 +566,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             ],
           ),
         ),
-
-        // Submit button
         ElevatedButton(
           onPressed: _saveProjectData,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF3949AB),
+            backgroundColor: const Color(0xFF1A237E),
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(12),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
@@ -623,13 +602,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       children: [
         Row(
           children: [
-            Icon(icon, color: Colors.grey[600], size: 20),
-            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A237E).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: const Color(0xFF1A237E), size: 20),
+            ),
+            const SizedBox(width: 12),
             Text(
               label,
-              style: TextStyle(
-                color: Colors.grey[700],
+              style: const TextStyle(
+                fontSize: 16,
                 fontWeight: FontWeight.w500,
+                color: Color(0xFF1A237E),
               ),
             ),
           ],
@@ -644,6 +631,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               horizontal: 16,
               vertical: 12,
             ),
+            prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
           ),
         ),
       ],
