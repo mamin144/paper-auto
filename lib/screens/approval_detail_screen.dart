@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/mir_data.dart';
 import '../services/report_service.dart';
 import 'mir_edit_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ApprovalDetailScreen extends StatefulWidget {
   final String pdfPath;
@@ -71,12 +72,15 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
 
   Future<void> _updateApprovalStatus(String status) async {
     try {
+      final user = FirebaseAuth.instance.currentUser;
       await FirebaseFirestore.instance
           .collection('approval_requests')
           .doc(widget.requestId)
           .update({
         'status': status,
         'updatedAt': FieldValue.serverTimestamp(),
+        'reviewerName': user?.displayName ?? user?.email,
+        'reviewerEmail': user?.email,
       });
     } catch (e) {
       debugPrint('Error updating approval status: $e');

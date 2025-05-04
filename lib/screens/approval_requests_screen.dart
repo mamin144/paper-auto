@@ -70,7 +70,8 @@ class _ApprovalRequestsScreenState extends State<ApprovalRequestsScreen> {
                     Text('Date: ${date.toString().split('.')[0]}'),
                     if (status != 'pending')
                       Text(
-                        'Status: ${status[0].toUpperCase() + status.substring(1)}',
+                        '${status == 'approved' ? 'Approved' : 'Rejected'}'
+                        '${request['reviewerName'] != null ? ' by ${request['reviewerName']}' : ''}',
                         style: TextStyle(
                           color: status == 'approved' ? Colors.green : Colors.red,
                           fontWeight: FontWeight.bold,
