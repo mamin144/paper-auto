@@ -116,6 +116,7 @@ class _MIREditScreenState extends State<MIREditScreen> {
       final updatedData = MIRData(
         projectName: _mirData.projectName,
         contractNo: _mirData.contractNo,
+        mirNo: _mirData.mirNo,
         boqItems: _boqItems,
         masStatus: _mirData.masStatus,
         dtsStatus: _mirData.dtsStatus,
@@ -154,11 +155,13 @@ class _MIREditScreenState extends State<MIREditScreen> {
     String? masStatus,
     String? dtsStatus,
     String? dispatchStatus,
+    String? mirNo,
   }) {
     setState(() {
       _mirData = MIRData(
         projectName: _mirData.projectName,
         contractNo: _mirData.contractNo,
+        mirNo: mirNo ?? _mirData.mirNo,
         boqItems: _boqItems,
         masStatus: masStatus ?? _mirData.masStatus,
         dtsStatus: dtsStatus ?? _mirData.dtsStatus,
@@ -202,6 +205,7 @@ class _MIREditScreenState extends State<MIREditScreen> {
       final updatedData = MIRData(
         projectName: _mirData.projectName,
         contractNo: _mirData.contractNo,
+        mirNo: _mirData.mirNo,
         boqItems: _boqItems,
         masStatus: _mirData.masStatus,
         dtsStatus: _mirData.dtsStatus,
@@ -627,6 +631,17 @@ class _MIREditScreenState extends State<MIREditScreen> {
                               Text(
                                 'Contract No: ${_mirData.contractNo}',
                                 style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                initialValue: _mirData.mirNo,
+                                decoration: const InputDecoration(
+                                  labelText: 'MIR No.',
+                                  border: OutlineInputBorder(),
+                                ),
+                                onChanged: (value) {
+                                  _updateMIRData(mirNo: value);
+                                },
                               ),
                             ],
                           ),

@@ -7,6 +7,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 import '../models/mir_data.dart';
 import '../screens/mir_edit_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../screens/firstscreen.dart';
 
 class GenerateReport extends StatefulWidget {
   final Map<String, dynamic> project;
@@ -70,33 +71,39 @@ class _GenerateReportState extends State<GenerateReport> {
         _error = null;
       });
 
-      String filePath;
       if (type == 'MIR') {
-        filePath = await _reportService.generateMIR(widget.project);
+        // Navigate to Firstscreen for category selection
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => Firstscreen(
+              projectData: widget.project,
+            ),
+          ),
+        );
       } else {
-        filePath = await _reportService.generateIR(widget.project);
-      }
+        // Handle IR generation as before
+        String filePath = await _reportService.generateIR(widget.project);
+        
+        if (!widget.isEditMode) {
+          final docRef = await FirebaseFirestore.instance.collection('approval_requests').add({
+            'createdAt': FieldValue.serverTimestamp(),
+            'lastUpdated': FieldValue.serverTimestamp(),
+            'status': 'pending',
+            'projectName': widget.project['projectDetails']['projectName'] ?? 'Untitled Project',
+            'reportType': type.toLowerCase(),
+            'senderId': FirebaseAuth.instance.currentUser?.uid,
+            'senderEmail': FirebaseAuth.instance.currentUser?.email,
+          });
+          _currentRequestId = docRef.id;
+        }
 
-      // If this is a new report (not edit mode), create a new request ID
-      if (!widget.isEditMode) {
-        final docRef = await FirebaseFirestore.instance.collection('approval_requests').add({
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastUpdated': FieldValue.serverTimestamp(),
-          'status': 'pending',
-          'projectName': widget.project['projectDetails']['projectName'] ?? 'Untitled Project',
-          'reportType': type.toLowerCase(),
-          'senderId': FirebaseAuth.instance.currentUser?.uid,
-          'senderEmail': FirebaseAuth.instance.currentUser?.email,
+        setState(() {
+          _lastGeneratedPath = filePath;
+          _lastGeneratedType = type;
+          _pdfPath = filePath;
+          _isPDFVisible = true;
         });
-        _currentRequestId = docRef.id;
       }
-
-      setState(() {
-        _lastGeneratedPath = filePath;
-        _lastGeneratedType = type;
-        _pdfPath = filePath;
-        _isPDFVisible = true;
-      });
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -204,6 +211,7 @@ class _GenerateReportState extends State<GenerateReport> {
         final initialData = MIRData(
           projectName: widget.project['projectDetails']['projectName'],
           contractNo: widget.project['projectDetails']['contractNo'] ?? 'A-17080',
+          mirNo: widget.project['projectDetails']['mirNo'] ?? '',
         );
 
         if (mounted) {
@@ -392,4 +400,4 @@ class _GenerateReportState extends State<GenerateReport> {
             ),
     );
   }
-} 
+}

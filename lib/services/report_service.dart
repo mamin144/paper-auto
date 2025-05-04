@@ -210,6 +210,18 @@ class ReportService {
                       ),
                     ],
                   ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('MIR No.'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(projectDetails['mirNo'] ?? ''),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               pw.SizedBox(height: 10),
@@ -544,6 +556,18 @@ class ReportService {
                       ),
                     ],
                   ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('MIR No.'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(mirData.mirNo),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               pw.SizedBox(height: 10),
@@ -777,4 +801,4 @@ class ReportService {
     await file.writeAsBytes(await pdf.save());
     return outputPath;
   }
-} 
+}   

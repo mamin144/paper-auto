@@ -37,6 +37,7 @@ class BOQItem {
 class MIRData {
   final String projectName;
   final String contractNo;
+  final String mirNo;
   final List<BOQItem> boqItems;
   final String masStatus;
   final String dtsStatus;
@@ -51,6 +52,7 @@ class MIRData {
   MIRData({
     required this.projectName,
     required this.contractNo,
+    this.mirNo = '',
     this.boqItems = const [],
     this.masStatus = '',
     this.dtsStatus = '',
@@ -67,6 +69,7 @@ class MIRData {
     return {
       'projectName': projectName,
       'contractNo': contractNo,
+      'mirNo': mirNo,
       'boqItems': boqItems.map((item) => item.toMap()).toList(),
       'masStatus': masStatus,
       'dtsStatus': dtsStatus,
@@ -84,6 +87,7 @@ class MIRData {
     return MIRData(
       projectName: map['projectName'] ?? '',
       contractNo: map['contractNo'] ?? '',
+      mirNo: map['mirNo'] ?? '',
       boqItems: (map['boqItems'] as List<dynamic>?)
           ?.map((item) => BOQItem.fromMap(item as Map<String, dynamic>))
           .toList() ??
