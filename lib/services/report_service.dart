@@ -8,6 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/mir_data.dart';
+import '../models/ir_data.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class ReportService {
@@ -797,6 +798,330 @@ class ReportService {
 
     final directory = await getTemporaryDirectory();
     final outputPath = '${directory.path}/MIR_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final file = File(outputPath);
+    await file.writeAsBytes(await pdf.save());
+    return outputPath;
+  }
+
+  Future<String> generatePDFFromIR(IRData irData) async {
+    final pdf = pw.Document();
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              // Header with logos
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Container(
+                    width: 100,
+                    height: 50,
+                    child: pw.Center(child: pw.Text('Logo 1')),
+                    decoration: pw.BoxDecoration(border: pw.Border.all()),
+                  ),
+                  pw.Container(
+                    width: 100,
+                    height: 50,
+                    child: pw.Center(child: pw.Text('AECOM')),
+                    decoration: pw.BoxDecoration(border: pw.Border.all()),
+                  ),
+                  pw.Container(
+                    width: 100,
+                    height: 50,
+                    child: pw.Center(child: pw.Text('Logo 3')),
+                    decoration: pw.BoxDecoration(border: pw.Border.all()),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              // Title
+              pw.Center(
+                child: pw.Text(
+                  'INSPECTION REPORT',
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              // Project details table
+              pw.Table(
+                border: pw.TableBorder.all(),
+                columnWidths: {
+                  0: pw.FlexColumnWidth(1),
+                  1: pw.FlexColumnWidth(3),
+                },
+                children: [
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('Project Name'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(irData.projectName),
+                      ),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('Contract No.'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(irData.contractNo),
+                      ),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('IR No.'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(irData.irNo),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              // Description table
+              pw.Table(
+                border: pw.TableBorder.all(),
+                columnWidths: {
+                  0: pw.FlexColumnWidth(2),
+                  1: pw.FlexColumnWidth(4),
+                  2: pw.FlexColumnWidth(1),
+                  3: pw.FlexColumnWidth(1),
+                  4: pw.FlexColumnWidth(2),
+                },
+                children: [
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('B.O.Q Ref. no.'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('Description'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('Unit'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('BOQ Qty'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('Remarks'),
+                      ),
+                    ],
+                  ),
+                  ...irData.boqItems.map((item) => pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(item.refNo),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(item.description),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(item.unit),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(item.quantity),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(item.remarks),
+                      ),
+                    ],
+                  )).toList(),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              // MAS/FAT Report section
+              pw.Table(
+                border: pw.TableBorder.all(),
+                children: [
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('MAS/FAT Report/Dispatch Clearance - Approvals'),
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Padding(
+                            padding: pw.EdgeInsets.all(5),
+                            child: pw.Text('MAS: ${irData.masStatus}'),
+                          ),
+                          pw.Padding(
+                            padding: pw.EdgeInsets.all(5),
+                            child: pw.Text('DTS: ${irData.dtsStatus}'),
+                          ),
+                          pw.Padding(
+                            padding: pw.EdgeInsets.all(5),
+                            child: pw.Text('Dispatch Clearance: ${irData.dispatchStatus}'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              // Additional details
+              pw.Table(
+                border: pw.TableBorder.all(),
+                children: [
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('Supplier Delivery Note/Date'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(irData.supplierDeliveryNote),
+                      ),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('Manufacturer'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(irData.manufacturer),
+                      ),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text('Country of Origin'),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(irData.countryOfOrigin),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              // Engineer's Comments
+              pw.Container(
+                decoration: pw.BoxDecoration(border: pw.Border.all()),
+                padding: pw.EdgeInsets.all(10),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text("Engineer's Comments:"),
+                    pw.SizedBox(height: 10),
+                    pw.Text(irData.engineerComments),
+                    pw.SizedBox(height: 10),
+                    pw.Text('The above materials have been inspected on site/store and found at time of inspection to be:'),
+                    pw.Row(
+                      children: [
+                        pw.Text('Satisfactory '),
+                        pw.Container(
+                          width: 20,
+                          height: 20,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(),
+                            color: irData.isSatisfactory ? PdfColors.grey300 : null,
+                          ),
+                        ),
+                        pw.Text('     Unsatisfactory '),
+                        pw.Container(
+                          width: 20,
+                          height: 20,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(),
+                            color: !irData.isSatisfactory ? PdfColors.grey300 : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              pw.Spacer(),
+              // Footer signatures
+              pw.Table(
+                border: pw.TableBorder.all(),
+                columnWidths: {
+                  0: pw.FlexColumnWidth(1),
+                  1: pw.FlexColumnWidth(1),
+                  2: pw.FlexColumnWidth(1),
+                },
+                children: [
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Center(child: pw.Text('Contractor')),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Center(child: pw.Text('Consultant')),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Center(child: pw.Text('Client')),
+                      ),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(20),
+                        child: pw.Center(child: pw.Text('ENVICON')),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(20),
+                        child: pw.Center(child: pw.Text('AECOM')),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(20),
+                        child: pw.Center(child: pw.Text('AADC')),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final directory = await getTemporaryDirectory();
+    final outputPath = '${directory.path}/IR_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File(outputPath);
     await file.writeAsBytes(await pdf.save());
     return outputPath;
