@@ -8,6 +8,8 @@ import '../models/mir_data.dart';
 import '../screens/mir_edit_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/firstscreen.dart';
+import '../models/ir_data.dart';
+import '../screens/ir_edit_screen.dart';
 
 class GenerateReport extends StatefulWidget {
   final Map<String, dynamic> project;
@@ -72,37 +74,81 @@ class _GenerateReportState extends State<GenerateReport> {
       });
 
       if (type == 'MIR') {
-        // Navigate to Firstscreen for category selection
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => Firstscreen(
-              projectData: widget.project,
+        // First navigate to Firstscreen for category selection
+        if (mounted) {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => Firstscreen(
+                projectData: widget.project,
+                reportType: 'mir',
+              ),
             ),
-          ),
-        );
-      } else {
-        // Handle IR generation as before
-        String filePath = await _reportService.generateIR(widget.project);
-        
-        if (!widget.isEditMode) {
-          final docRef = await FirebaseFirestore.instance.collection('approval_requests').add({
-            'createdAt': FieldValue.serverTimestamp(),
-            'lastUpdated': FieldValue.serverTimestamp(),
-            'status': 'pending',
-            'projectName': widget.project['projectDetails']['projectName'] ?? 'Untitled Project',
-            'reportType': type.toLowerCase(),
-            'senderId': FirebaseAuth.instance.currentUser?.uid,
-            'senderEmail': FirebaseAuth.instance.currentUser?.email,
-          });
-          _currentRequestId = docRef.id;
-        }
+          );
 
-        setState(() {
-          _lastGeneratedPath = filePath;
-          _lastGeneratedType = type;
-          _pdfPath = filePath;
-          _isPDFVisible = true;
-        });
+          // Handle the category selection result
+          if (mounted && result != null) {
+            final categoryData = result as Map<String, dynamic>;
+            final requestId = categoryData['requestId'] as String;
+            final initialData = categoryData['initialData'] as MIRData;
+
+            // Update the current request ID
+            _currentRequestId = requestId;
+
+            // Update the MIR data in Firestore
+            await FirebaseFirestore.instance
+                .collection('mir_data')
+                .doc(requestId)
+                .set(initialData.toMap());
+
+            // Generate and display the PDF
+            final filePath = await _reportService.generatePDFFromMIR(initialData);
+            
+            setState(() {
+              _lastGeneratedPath = filePath;
+              _lastGeneratedType = type;
+              _pdfPath = filePath;
+              _isPDFVisible = true;
+            });
+          }
+        }
+      } else if (type == 'IR') {
+        // First navigate to Firstscreen for category selection
+        if (mounted) {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => Firstscreen(
+                projectData: widget.project,
+                reportType: 'ir',
+              ),
+            ),
+          );
+
+          // Handle the category selection result
+          if (mounted && result != null) {
+            final categoryData = result as Map<String, dynamic>;
+            final requestId = categoryData['requestId'] as String;
+            final initialData = categoryData['initialData'] as IRData;
+
+            // Update the current request ID
+            _currentRequestId = requestId;
+
+            // Update the IR data in Firestore
+            await FirebaseFirestore.instance
+                .collection('ir_data')
+                .doc(requestId)
+                .set(initialData.toMap());
+
+            // Generate and display the PDF
+            final filePath = await _reportService.generatePDFFromIR(initialData);
+            
+            setState(() {
+              _lastGeneratedPath = filePath;
+              _lastGeneratedType = type;
+              _pdfPath = filePath;
+              _isPDFVisible = true;
+            });
+          }
+        }
       }
     } catch (e) {
       setState(() {
@@ -239,6 +285,73 @@ class _GenerateReportState extends State<GenerateReport> {
     }
   }
 
+  Future<void> _navigateToIREdit() async {
+    if (_currentRequestId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No request ID found. Please generate a report first.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Get the IR data from Firestore
+      final irDoc = await FirebaseFirestore.instance
+          .collection('ir_data')
+          .doc(_currentRequestId)
+          .get();
+
+      if (irDoc.exists) {
+        final irData = IRData.fromMap(irDoc.data()!);
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => IREditScreen(
+                requestId: _currentRequestId!,
+                initialData: irData,
+                isCreator: widget.isCreator,
+              ),
+            ),
+          );
+        }
+      } else {
+        // If no IR data exists, create initial data
+        final initialData = IRData(
+          projectName: widget.project['projectDetails']['projectName'],
+          contractNo: widget.project['projectDetails']['contractNo'] ?? 'A-17080',
+          irNo: widget.project['projectDetails']['irNo'] ?? '',
+        );
+
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => IREditScreen(
+                requestId: _currentRequestId!,
+                initialData: initialData,
+                isCreator: widget.isCreator,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading IR data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -327,9 +440,11 @@ class _GenerateReportState extends State<GenerateReport> {
                                 SizedBox(
                                   height: 48,
                                   child: TextButton.icon(
-                                    onPressed: !_isSending ? _navigateToMIREdit : null,
+                                    onPressed: !_isSending 
+                                      ? (_lastGeneratedType == 'MIR' ? _navigateToMIREdit : _navigateToIREdit)
+                                      : null,
                                     icon: const Icon(Icons.edit),
-                                    label: const Text('Edit MIR'),
+                                    label: Text('Edit ${_lastGeneratedType ?? "Report"}'),
                                     style: TextButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(horizontal: 24),
                                     ),

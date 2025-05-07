@@ -49,9 +49,12 @@ class RegistrationScreen extends StatefulWidget {
   State<RegistrationScreen> createState() => _RegistrationScreenState();
 }
 
-class _RegistrationScreenState extends State<RegistrationScreen> {
+class _RegistrationScreenState extends State<RegistrationScreen> with SingleTickerProviderStateMixin {
   int _currentStep = 0;
   final int _totalSteps = 3;
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   // Add variable to store the selected profile image
   File? _profileImage;
@@ -78,11 +81,60 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   // Project service instance
   final ProjectService _projectService = ProjectService();
 
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.2),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    // Clean up controllers
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _displayNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _projectNameController.dispose();
+    _projectAreaController.dispose();
+    _projectTypeController.dispose();
+    _villageController.dispose();
+    _buildingController.dispose();
+    _mallsController.dispose();
+    _parkingController.dispose();
+    super.dispose();
+  }
+
   void _goToNextStep() {
     if (_currentStep < _totalSteps - 1) {
       setState(() {
         _currentStep++;
       });
+      _controller.reset();
+      _controller.forward();
     }
   }
 
@@ -91,6 +143,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       setState(() {
         _currentStep--;
       });
+      _controller.reset();
+      _controller.forward();
     }
   }
 
@@ -179,129 +233,144 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   @override
-  void dispose() {
-    // Clean up controllers
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _displayNameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _projectNameController.dispose();
-    _projectAreaController.dispose();
-    _projectTypeController.dispose();
-    _villageController.dispose();
-    _buildingController.dispose();
-    _mallsController.dispose();
-    _parkingController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF3949AB),
-        title: const Text('Paper Automation'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _currentStep > 0 ? _goToPreviousStep : null,
-        ),
-      ),
       body: Container(
-        color: const Color(0xFF3949AB),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            // Logo - now using profile image if available
-            GestureDetector(
-              onTap: _pickProfileImage,
-              child: Column(
-                children: [
-                  const Text(
-                    'Click to upload profile image',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF3949AB), Color(0xFF1A237E)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: _currentStep > 0 ? _goToPreviousStep : null,
+                    ),
+                    const SizedBox(width: 16),
+                    const Text(
+                      'Create New Project',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Logo with animation
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: GestureDetector(
+                    onTap: _pickProfileImage,
+                    child: Column(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: CircleAvatar(
+                            backgroundColor: const Color(0xFF5C6BC0),
+                            radius: 50,
+                            backgroundImage: _profileImage != null
+                                ? FileImage(_profileImage!)
+                                : null,
+                            child: _profileImage == null
+                                ? Icon(
+                                    Icons.gavel,
+                                    size: 40,
+                                    color: Colors.white.withOpacity(0.8),
+                                  )
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _profileImage != null ? 'Tap to change' : 'Tap to upload profile',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFF5C6BC0),
-                    radius: 40,
-                    backgroundImage:
-                        _profileImage != null
-                            ? FileImage(_profileImage!)
-                            : null,
-                    child:
-                        _profileImage == null
-                            ? Icon(
-                              Icons.gavel,
-                              size: 40,
-                              color: Colors.white.withOpacity(0.8),
-                            )
-                            : null,
-                  ),
-                ],
+                ),
               ),
-            ),
-            if (_profileImage != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  'Tap to change',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 12,
+              const SizedBox(height: 30),
+              // Steps indicator with animation
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildStepIndicator(0, 'Personal Info'),
+                      const SizedBox(width: 24),
+                      _buildStepIndicator(1, 'Project Details'),
+                      const SizedBox(width: 24),
+                      _buildStepIndicator(2, 'Description'),
+                    ],
                   ),
                 ),
               ),
-            const SizedBox(height: 20),
-            // Title
-            const Text(
-              'Join Our Network of Legal Professionals',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Subtitle
-            const Text(
-              'Complete the form to start connecting with Engineers',
-              style: TextStyle(color: Colors.white, fontSize: 14),
-            ),
-            const SizedBox(height: 24),
-            // Steps indicator
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildStepIndicator(0, 'Personal Info'),
-                const SizedBox(width: 24),
-                _buildStepIndicator(1, 'Project Details'),
-                const SizedBox(width: 24),
-                _buildStepIndicator(2, 'Description'),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // Form
-            Expanded(
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(30),
-                    topRight: Radius.circular(30),
+              const SizedBox(height: 30),
+              // Form with animation
+              Expanded(
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(30),
+                          topRight: Radius.circular(30),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 10,
+                            offset: Offset(0, -5),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(30),
+                          topRight: Radius.circular(30),
+                        ),
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(24),
+                          child: _buildCurrentStep(),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: _buildCurrentStep(),
-                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -313,24 +382,38 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     return Column(
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor:
-              isActive
-                  ? const Color(0xFF3949AB)
-                  : isCompleted
-                  ? Colors.green
-                  : Colors.grey.withOpacity(0.3),
-          child:
-              isCompleted
-                  ? const Icon(Icons.check, color: Colors.white, size: 16)
-                  : Text(
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive
+                ? Colors.white
+                : isCompleted
+                    ? Colors.green
+                    : Colors.white.withOpacity(0.3),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: isCompleted
+                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                : Text(
                     '${step + 1}',
                     style: TextStyle(
-                      color: isActive ? Colors.white : Colors.grey,
+                      color: isActive ? const Color(0xFF3949AB) : Colors.white,
                       fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
+          ),
         ),
         const SizedBox(height: 8),
         Text(
@@ -338,6 +421,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           style: TextStyle(
             color: isActive ? Colors.white : Colors.white.withOpacity(0.7),
             fontSize: 12,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ],
@@ -364,13 +448,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         // Name row label
         Row(
           children: [
-            Icon(Icons.person, color: Colors.grey[600], size: 20),
+            Icon(Icons.person, color: const Color(0xFF3949AB), size: 20),
             const SizedBox(width: 8),
             Text(
               'Name',
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontWeight: FontWeight.w500,
+              style: const TextStyle(
+                color: Color(0xFF3949AB),
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
               ),
             ),
           ],
@@ -505,110 +590,112 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   Widget _buildNavigationButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // Back button
-        ElevatedButton(
-          onPressed: _currentStep > 0 ? _goToPreviousStep : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor:
-                _currentStep > 0 ? Colors.grey[300] : Colors.grey[200],
-            foregroundColor:
-                _currentStep > 0 ? Colors.black87 : Colors.grey[400],
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
-          child: Row(
-            children: const [
-              Icon(Icons.arrow_back, size: 16),
-              SizedBox(width: 8),
-              Text(
-                "Back",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          ElevatedButton(
+            onPressed: _currentStep > 0 ? _goToPreviousStep : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey[200],
+              foregroundColor: Colors.black87,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
-          ),
-        ),
-
-        // Next button
-        ElevatedButton(
-          onPressed: _goToNextStep,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color.fromARGB(255, 17, 2, 98),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Row(
+              children: const [
+                Icon(Icons.arrow_back, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  "Back",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
           ),
-          child: Row(
-            children: const [
-              Text(
-                "Next",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ElevatedButton(
+            onPressed: _goToNextStep,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3949AB),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              SizedBox(width: 8),
-              Icon(Icons.arrow_forward, size: 16),
-            ],
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Row(
+              children: const [
+                Text(
+                  "Next",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                SizedBox(width: 8),
+                Icon(Icons.arrow_forward, size: 20),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildFinalStepButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // Back button
-        ElevatedButton(
-          onPressed: _goToPreviousStep,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[300],
-            foregroundColor: Colors.black87,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
-          child: Row(
-            children: const [
-              Icon(Icons.arrow_back, size: 16),
-              SizedBox(width: 8),
-              Text(
-                "Back",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          ElevatedButton(
+            onPressed: _goToPreviousStep,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey[200],
+              foregroundColor: Colors.black87,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
-          ),
-        ),
-
-        // Submit button
-        ElevatedButton(
-          onPressed: _saveProjectData,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF3949AB),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Row(
+              children: const [
+                Icon(Icons.arrow_back, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  "Back",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
           ),
-          child: Row(
-            children: const [
-              Text(
-                "Submit",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ElevatedButton(
+            onPressed: _saveProjectData,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3949AB),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              SizedBox(width: 8),
-              Icon(Icons.check_circle, size: 16),
-            ],
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Row(
+              children: const [
+                Text(
+                  "Submit",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                SizedBox(width: 8),
+                Icon(Icons.check_circle, size: 20),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -618,35 +705,55 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     required String hintText,
     required TextEditingController controller,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: Colors.grey[600], size: 20),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Icon(icon, color: const Color(0xFF3949AB), size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFF3949AB),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+          TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: hintText,
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              border: InputBorder.none,
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
