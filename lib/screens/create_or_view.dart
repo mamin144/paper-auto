@@ -50,12 +50,9 @@ class ScreenOne extends StatelessWidget {
                 const SizedBox(height: 8),
                 const Text(
                   "Create new projects or view existing ones",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
-                const SizedBox(height: 60),
+                const SizedBox(height: 150),
                 _buildOptionCard(
                   context,
                   title: "Create Project",
@@ -63,7 +60,7 @@ class ScreenOne extends StatelessWidget {
                   icon: Icons.add_circle_outline,
                   onTap: () => _navigateTo(context, const CreateProject()),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 40),
                 _buildOptionCard(
                   context,
                   title: "View Projects",
@@ -88,9 +85,7 @@ class ScreenOne extends StatelessWidget {
   }) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -104,11 +99,7 @@ class ScreenOne extends StatelessWidget {
                   color: const Color(0xFF3949AB).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  size: 32,
-                  color: const Color(0xFF3949AB),
-                ),
+                child: Icon(icon, size: 32, color: const Color(0xFF3949AB)),
               ),
               const SizedBox(width: 20),
               Expanded(
@@ -126,10 +117,7 @@ class ScreenOne extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),
                   ],
                 ),
@@ -155,7 +143,10 @@ class ScreenOne extends StatelessWidget {
           const begin = Offset(1.0, 0.0);
           const end = Offset.zero;
           const curve = Curves.easeInOut;
-          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          var tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
           var offsetAnimation = animation.drive(tween);
           return SlideTransition(position: offsetAnimation, child: child);
         },

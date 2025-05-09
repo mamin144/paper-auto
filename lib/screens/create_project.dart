@@ -2,15 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:paperauto/screens/firstscreen.dart';
+import 'package:paperauto/screens/create_or_view.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:paperauto/services/firebase_options.dart';
 import 'package:paperauto/services/project_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const CreateProject());
 }
 
@@ -49,7 +48,8 @@ class RegistrationScreen extends StatefulWidget {
   State<RegistrationScreen> createState() => _RegistrationScreenState();
 }
 
-class _RegistrationScreenState extends State<RegistrationScreen> with SingleTickerProviderStateMixin {
+class _RegistrationScreenState extends State<RegistrationScreen>
+    with SingleTickerProviderStateMixin {
   int _currentStep = 0;
   final int _totalSteps = 3;
   late AnimationController _controller;
@@ -72,14 +72,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> with SingleTick
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _projectNameController = TextEditingController();
   final TextEditingController _projectAreaController = TextEditingController();
-  final TextEditingController _projectTypeController = TextEditingController();
   final TextEditingController _villageController = TextEditingController();
   final TextEditingController _buildingController = TextEditingController();
   final TextEditingController _mallsController = TextEditingController();
   final TextEditingController _parkingController = TextEditingController();
+  // Add new controllers for residential fields
+  final TextEditingController _repetitionController = TextEditingController();
+  final TextEditingController _basementController = TextEditingController();
+  final TextEditingController _roofsController = TextEditingController();
+  final TextEditingController _apartmentsController = TextEditingController();
+  final TextEditingController _numberOfshopsontroller = TextEditingController();
 
   // Project service instance
   final ProjectService _projectService = ProjectService();
+
+  String? _selectedProjectType;
 
   @override
   void initState() {
@@ -120,11 +127,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> with SingleTick
     _phoneController.dispose();
     _projectNameController.dispose();
     _projectAreaController.dispose();
-    _projectTypeController.dispose();
     _villageController.dispose();
     _buildingController.dispose();
     _mallsController.dispose();
     _parkingController.dispose();
+    // Dispose new controllers
+    _repetitionController.dispose();
+    _basementController.dispose();
+    _roofsController.dispose();
+    _apartmentsController.dispose();
     super.dispose();
   }
 
@@ -145,6 +156,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> with SingleTick
       });
       _controller.reset();
       _controller.forward();
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const ScreenOne()),
+      );
     }
   }
 
@@ -189,15 +205,24 @@ class _RegistrationScreenState extends State<RegistrationScreen> with SingleTick
       final projectDetails = {
         'projectName': _projectNameController.text,
         'projectArea': _projectAreaController.text,
-        'projectType': _projectTypeController.text,
+        'projectType': _selectedProjectType,
       };
 
-      final projectDescription = {
-        'village': _villageController.text,
-        'building': _buildingController.text,
-        'malls': _mallsController.text,
-        'parking': _parkingController.text,
-      };
+      final projectDescription =
+          _selectedProjectType == 'Residential'
+              ? {
+                'repetition': _repetitionController.text,
+                'basement': _basementController.text,
+                'roofs': _roofsController.text,
+                'apartments': _apartmentsController.text,
+              }
+              : {
+                'repetition': _repetitionController.text,
+                'basement': _basementController.text,
+                'roofs': _roofsController.text,
+                'apartments': _apartmentsController.text,
+                'number of shops': _numberOfshopsontroller.text,
+              };
 
       // Save project using the service
       await _projectService.createProject(
@@ -252,7 +277,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> with SingleTick
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: _currentStep > 0 ? _goToPreviousStep : null,
+                      onPressed: _goToPreviousStep,
                     ),
                     const SizedBox(width: 16),
                     const Text(
@@ -290,21 +315,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> with SingleTick
                           child: CircleAvatar(
                             backgroundColor: const Color(0xFF5C6BC0),
                             radius: 50,
-                            backgroundImage: _profileImage != null
-                                ? FileImage(_profileImage!)
-                                : null,
-                            child: _profileImage == null
-                                ? Icon(
-                                    Icons.gavel,
-                                    size: 40,
-                                    color: Colors.white.withOpacity(0.8),
-                                  )
-                                : null,
+                            backgroundImage:
+                                _profileImage != null
+                                    ? FileImage(_profileImage!)
+                                    : null,
+                            child:
+                                _profileImage == null
+                                    ? Icon(
+                                      Icons.gavel,
+                                      size: 40,
+                                      color: Colors.white.withOpacity(0.8),
+                                    )
+                                    : null,
                           ),
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          _profileImage != null ? 'Tap to change' : 'Tap to upload profile',
+                          _profileImage != null
+                              ? 'Tap to change'
+                              : 'Tap to upload profile',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.8),
                             fontSize: 14,
@@ -387,32 +416,36 @@ class _RegistrationScreenState extends State<RegistrationScreen> with SingleTick
           height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isActive
-                ? Colors.white
-                : isCompleted
+            color:
+                isActive
+                    ? Colors.white
+                    : isCompleted
                     ? Colors.green
                     : Colors.white.withOpacity(0.3),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
+            boxShadow:
+                isActive
+                    ? [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                    : null,
           ),
           child: Center(
-            child: isCompleted
-                ? const Icon(Icons.check, color: Colors.white, size: 20)
-                : Text(
-                    '${step + 1}',
-                    style: TextStyle(
-                      color: isActive ? const Color(0xFF3949AB) : Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+            child:
+                isCompleted
+                    ? const Icon(Icons.check, color: Colors.white, size: 20)
+                    : Text(
+                      '${step + 1}',
+                      style: TextStyle(
+                        color:
+                            isActive ? const Color(0xFF3949AB) : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
           ),
         ),
         const SizedBox(height: 8),
@@ -540,11 +573,77 @@ class _RegistrationScreenState extends State<RegistrationScreen> with SingleTick
           controller: _projectAreaController,
         ),
         const SizedBox(height: 20),
-        _buildFormField(
-          icon: Icons.location_on,
-          label: 'Project Type',
-          hintText: ' ما نوع المشروع ',
-          controller: _projectTypeController,
+        Container(
+          margin: const EdgeInsets.only(bottom: 20),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      color: const Color(0xFF3949AB),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Project Type',
+                      style: const TextStyle(
+                        color: Color(0xFF3949AB),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedProjectType,
+                    hint: Text(
+                      'Select project type',
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Residential',
+                        child: Text('Residential'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Commercial',
+                        child: Text('Commercial'),
+                      ),
+                    ],
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedProjectType = newValue;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 30),
         _buildNavigationButtons(),
@@ -556,33 +655,70 @@ class _RegistrationScreenState extends State<RegistrationScreen> with SingleTick
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildFormField(
-          icon: Icons.villa,
-          label: 'Villas',
-          hintText: 'كم عدد الفلل',
-          controller: _villageController,
-        ),
-        const SizedBox(height: 20),
-        _buildFormField(
-          icon: Icons.house,
-          label: 'building ',
-          hintText: 'كم عدد المباني',
-          controller: _buildingController,
-        ),
-        const SizedBox(height: 20),
-        _buildFormField(
-          icon: Icons.local_mall,
-          label: 'Malls',
-          hintText: 'كم عدد المولات',
-          controller: _mallsController,
-        ),
-        const SizedBox(height: 20),
-        _buildFormField(
-          icon: Icons.park,
-          label: 'parking',
-          hintText: 'كم عدد المواقف',
-          controller: _parkingController,
-        ),
+        if (_selectedProjectType == 'Residential') ...[
+          _buildFormField(
+            icon: Icons.repeat,
+            label: 'عدد متكرر',
+            hintText: 'ادخل العدد المتكرر',
+            controller: _repetitionController,
+          ),
+          const SizedBox(height: 20),
+          _buildFormField(
+            icon: Icons.layers,
+            label: 'عدد البدرومات',
+            hintText: 'ادخل عدد البدرومات',
+            controller: _basementController,
+          ),
+          const SizedBox(height: 20),
+          _buildFormField(
+            icon: Icons.roofing,
+            label: 'عدد الروفات',
+            hintText: 'ادخل عدد الروفات',
+            controller: _roofsController,
+          ),
+          const SizedBox(height: 20),
+          _buildFormField(
+            icon: Icons.apartment,
+            label: 'عدد الشقق',
+            hintText: 'ادخل عدد الشقق',
+            controller: _apartmentsController,
+          ),
+        ] else ...[
+          _buildFormField(
+            icon: Icons.repeat,
+            label: 'عدد متكرر',
+            hintText: 'ادخل العدد المتكرر',
+            controller: _repetitionController,
+          ),
+          const SizedBox(height: 20),
+          _buildFormField(
+            icon: Icons.layers,
+            label: 'عدد البدرومات',
+            hintText: 'ادخل عدد البدرومات',
+            controller: _basementController,
+          ),
+          const SizedBox(height: 20),
+          _buildFormField(
+            icon: Icons.roofing,
+            label: 'عدد الروفات',
+            hintText: 'ادخل عدد الروفات',
+            controller: _roofsController,
+          ),
+          const SizedBox(height: 20),
+          _buildFormField(
+            icon: Icons.apartment,
+            label: 'عدد الشقق',
+            hintText: 'ادخل عدد الشقق',
+            controller: _apartmentsController,
+          ),
+          const SizedBox(height: 20),
+          _buildFormField(
+            icon: Icons.apartment,
+            label: ' عدد المحلات في الدور',
+            hintText: 'ادخل عدد المحلات',
+            controller: _numberOfshopsontroller,
+          ),
+        ],
         const SizedBox(height: 30),
         _buildFinalStepButtons(),
       ],
