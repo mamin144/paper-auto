@@ -4,6 +4,9 @@ import '../models/ir_data.dart';
 import '../services/report_service.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 class IREditScreen extends StatefulWidget {
   final String requestId;
@@ -142,14 +145,13 @@ class _IREditScreenState extends State<IREditScreen> {
     } catch (e, stackTrace) {
       print('Error generating PDF preview: $e');
       print('Stack trace: $stackTrace');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error generating PDF preview: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      final scaffoldMessenger = ScaffoldMessenger.of(this.context);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Error generating PDF preview: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -201,6 +203,16 @@ class _IREditScreenState extends State<IREditScreen> {
     });
   }
 
+  Future<String?> _getSignatureImagePath() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final imagePath = join(directory.path, 'signature.png');
+    final file = File(imagePath);
+    if (await file.exists()) {
+      return imagePath;
+    }
+    return null;
+  }
+
   Future<void> _saveIR(bool approved) async {
     setState(() => _isLoading = true);
 
@@ -244,7 +256,11 @@ class _IREditScreenState extends State<IREditScreen> {
           .set(updatedData.toMap());
 
       // Generate and save the PDF
-      final pdfPath = await _reportService.generatePDFFromIR(updatedData);
+      String? signaturePath;
+      if (approved) {
+        signaturePath = await _getSignatureImagePath();
+      }
+      final pdfPath = await _reportService.generatePDFFromIR(updatedData, signaturePath: signaturePath);
       
       // Upload the PDF to storage with correct type
       final pdfId = await _reportService.uploadPDF(pdfPath, 'ir');
@@ -283,15 +299,14 @@ class _IREditScreenState extends State<IREditScreen> {
 
         await batch.commit();
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('IR sent to ${_recipientEmails.length} recipients'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.of(context).pop();
-        }
+        final scaffoldMessenger = ScaffoldMessenger.of(this.context);
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('IR sent to ${_recipientEmails.length} recipients'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(this.context).pop();
       } else {
         // If reviewer is editing, update with approval/rejection
         await FirebaseFirestore.instance
@@ -310,31 +325,29 @@ class _IREditScreenState extends State<IREditScreen> {
           'reportType': 'ir',
         });
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(approved 
-                ? 'IR approved and sent back to creator' 
-                : 'IR rejected and sent back to creator'
-              ),
-              backgroundColor: approved ? Colors.green : Colors.red,
-            ),
-          );
-          Navigator.of(context)
-            ..pop() // Pop IREditScreen
-            ..pop(); // Pop ApprovalDetailScreen
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        final scaffoldMessenger = ScaffoldMessenger.of(this.context);
+        scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text('Error saving IR: $e'),
-            backgroundColor: Colors.red,
+            content: Text(approved 
+              ? 'IR approved and sent back to creator' 
+              : 'IR rejected and sent back to creator'
+            ),
+            backgroundColor: approved ? Colors.green : Colors.red,
           ),
         );
-        rethrow;
+        Navigator.of(this.context)
+          ..pop() // Pop IREditScreen
+          ..pop(); // Pop ApprovalDetailScreen
       }
+    } catch (e) {
+      final scaffoldMessenger = ScaffoldMessenger.of(this.context);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Error saving IR: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      rethrow;
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -486,7 +499,7 @@ class _IREditScreenState extends State<IREditScreen> {
                                           await _saveIR(true);
                                         } catch (e) {
                                           if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(this.context).showSnackBar(
                                               SnackBar(
                                                 content: Text('Error: $e'),
                                                 backgroundColor: Colors.red,
@@ -517,7 +530,7 @@ class _IREditScreenState extends State<IREditScreen> {
                                           await _saveIR(false);
                                         } catch (e) {
                                           if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(this.context).showSnackBar(
                                               SnackBar(
                                                 content: Text('Error: $e'),
                                                 backgroundColor: Colors.red,
@@ -545,7 +558,7 @@ class _IREditScreenState extends State<IREditScreen> {
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
                                         if (_recipientEmails.isEmpty) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(this.context).showSnackBar(
                                             const SnackBar(
                                               content: Text('Please add at least one recipient'),
                                               backgroundColor: Colors.red,
@@ -558,7 +571,7 @@ class _IREditScreenState extends State<IREditScreen> {
                                           await _saveIR(true);
                                         } catch (e) {
                                           if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(this.context).showSnackBar(
                                               SnackBar(
                                                 content: Text('Error: $e'),
                                                 backgroundColor: Colors.red,
@@ -627,17 +640,17 @@ class _IREditScreenState extends State<IREditScreen> {
                             children: [
                               Text(
                                 'Project Information',
-                                style: Theme.of(context).textTheme.titleLarge,
+                                style: Theme.of(this.context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 16),
                               Text(
                                 'Project: ${_irData.projectName}',
-                                style: Theme.of(context).textTheme.titleMedium,
+                                style: Theme.of(this.context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 'Contract No: ${_irData.contractNo}',
-                                style: Theme.of(context).textTheme.titleMedium,
+                                style: Theme.of(this.context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
@@ -668,7 +681,7 @@ class _IREditScreenState extends State<IREditScreen> {
                                 children: [
                                   Text(
                                     'BOQ Items',
-                                    style: Theme.of(context).textTheme.titleLarge,
+                                    style: Theme.of(this.context).textTheme.titleLarge,
                                   ),
                                   ElevatedButton.icon(
                                     onPressed: _addNewBOQItem,
@@ -704,8 +717,8 @@ class _IREditScreenState extends State<IREditScreen> {
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: [
-                                      Theme.of(context).primaryColor,
-                                      Theme.of(context).primaryColor.withOpacity(0.1),
+                                      Theme.of(this.context).primaryColor,
+                                      Theme.of(this.context).primaryColor.withOpacity(0.1),
                                     ],
                                   ),
                                 ),
@@ -897,7 +910,7 @@ class _IREditScreenState extends State<IREditScreen> {
                             children: [
                               Text(
                                 'Additional Details',
-                                style: Theme.of(context).textTheme.titleLarge,
+                                style: Theme.of(this.context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 16),
                               TextFormField(
@@ -938,7 +951,7 @@ class _IREditScreenState extends State<IREditScreen> {
                             children: [
                               Text(
                                 'MAS/FAT Report Status',
-                                style: Theme.of(context).textTheme.titleLarge,
+                                style: Theme.of(this.context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 16),
                               DropdownButtonFormField<String>(
@@ -997,7 +1010,7 @@ class _IREditScreenState extends State<IREditScreen> {
                             children: [
                               Text(
                                 "Engineer's Comments",
-                                style: Theme.of(context).textTheme.titleLarge,
+                                style: Theme.of(this.context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 16),
                               TextFormField(

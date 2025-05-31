@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:paperauto/Auth/profile.dart';
 import 'package:paperauto/screens/test_payment_screen.dart';
 import 'package:paperauto/screens/approval_requests_screen.dart';
+import 'package:paperauto/screens/signature_screen.dart';
 
 class HomeDrawer extends StatelessWidget {
   HomeDrawer({Key? key});
@@ -79,6 +80,25 @@ class HomeDrawer extends StatelessWidget {
                   Icon(Icons.approval, size: 30),
                   SizedBox(width: 3),
                   Text(' Approval Requests ', style: TextStyle(fontSize: 21)),
+                ],
+              ),
+            ),
+            SizedBox(height: 18),
+
+            // Add Manage Signature button
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => SignatureScreen()),
+                );
+              },
+              child: Row(
+                children: [
+                  SizedBox(width: 9),
+                  Icon(Icons.brush, size: 30),
+                  SizedBox(width: 3),
+                  Text(' Manage Signature ', style: TextStyle(fontSize: 21)),
                 ],
               ),
             ),

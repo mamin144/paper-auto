@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/mir_data.dart';
 import '../models/ir_data.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart';
 
 class ReportService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -479,9 +480,13 @@ class ReportService {
     await OpenFile.open(filePath);
   }
 
-  Future<String> generatePDFFromMIR(MIRData mirData) async {
+  Future<String> generatePDFFromMIR(MIRData mirData, {String? signaturePath}) async {
     final pdf = pw.Document();
-    
+    pw.MemoryImage? signatureImage;
+    if (signaturePath != null && await File(signaturePath).exists()) {
+      final bytes = await File(signaturePath).readAsBytes();
+      signatureImage = pw.MemoryImage(bytes);
+    }
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -775,8 +780,16 @@ class ReportService {
                   pw.TableRow(
                     children: [
                       pw.Padding(
-                        padding: pw.EdgeInsets.all(20),
-                        child: pw.Center(child: pw.Text('ENVICON')),
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Container(
+                          height: 50,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(),
+                          ),
+                          child: signatureImage != null
+                            ? pw.Image(signatureImage, fit: pw.BoxFit.contain)
+                            : pw.Center(child: pw.Text('Signature', style: pw.TextStyle(fontSize: 12))),
+                        ),
                       ),
                       pw.Padding(
                         padding: pw.EdgeInsets.all(20),
@@ -795,7 +808,6 @@ class ReportService {
         },
       ),
     );
-
     final directory = await getTemporaryDirectory();
     final outputPath = '${directory.path}/MIR_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File(outputPath);
@@ -803,9 +815,13 @@ class ReportService {
     return outputPath;
   }
 
-  Future<String> generatePDFFromIR(IRData irData) async {
+  Future<String> generatePDFFromIR(IRData irData, {String? signaturePath}) async {
     final pdf = pw.Document();
-    
+    pw.MemoryImage? signatureImage;
+    if (signaturePath != null && await File(signaturePath).exists()) {
+      final bytes = await File(signaturePath).readAsBytes();
+      signatureImage = pw.MemoryImage(bytes);
+    }
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -1099,8 +1115,16 @@ class ReportService {
                   pw.TableRow(
                     children: [
                       pw.Padding(
-                        padding: pw.EdgeInsets.all(20),
-                        child: pw.Center(child: pw.Text('ENVICON')),
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Container(
+                          height: 50,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(),
+                          ),
+                          child: signatureImage != null
+                            ? pw.Image(signatureImage, fit: pw.BoxFit.contain)
+                            : pw.Center(child: pw.Text('Signature', style: pw.TextStyle(fontSize: 12))),
+                        ),
                       ),
                       pw.Padding(
                         padding: pw.EdgeInsets.all(20),
@@ -1119,7 +1143,6 @@ class ReportService {
         },
       ),
     );
-
     final directory = await getTemporaryDirectory();
     final outputPath = '${directory.path}/IR_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File(outputPath);
