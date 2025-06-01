@@ -30,42 +30,29 @@ class IREditScreen extends StatefulWidget {
 }
 
 class _IREditScreenState extends State<IREditScreen> {
-  late IRData _irData;
   final _formKey = GlobalKey<FormState>();
-  bool _isLoading = false;
-  bool _isPDFVisible = false;
-  String? _pdfPath;
-  final _reportService = ReportService();
   final _recipientController = TextEditingController();
-  final List<String> _recipientEmails = [];
-  final FocusNode _recipientFocusNode = FocusNode();
+  final _recipientFocusNode = FocusNode();
   final _supplierController = TextEditingController();
   final _manufacturerController = TextEditingController();
   final _countryController = TextEditingController();
   final _commentsController = TextEditingController();
-  final List<BOQItem> _boqItems = [];
+  final Set<String> _recipientEmails = {};
+  bool _isLoading = false;
+  bool _isPDFVisible = false;
+  String? _pdfPath;
   String? _signatureImagePath;
   String? _sealImagePath;
-  String? _currentUserId;
+  late IRData _irData;
+  List<BOQItem> _boqItems = [];
+  int _totalPages = 0;
+  int _currentPage = 0;
+  PDFViewController? _pdfViewController;
+  final _reportService = ReportService();
 
   @override
   void initState() {
     super.initState();
-    _currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    if (_currentUserId == null) {
-      print('User not logged in!');
-      if (mounted) {
-        ScaffoldMessenger.of(this.context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'User not logged in. Please log in to manage signatures.',
-            ),
-          ),
-        );
-        Navigator.of(this.context).pop();
-      }
-      return;
-    }
     _irData = widget.initialData;
     _supplierController.text = _irData.supplierDeliveryNote;
     _manufacturerController.text = _irData.manufacturer;
@@ -240,9 +227,11 @@ class _IREditScreenState extends State<IREditScreen> {
   }
 
   Future<String?> _getSignatureImagePath() async {
-    if (_currentUserId == null) return null;
     final directory = await getApplicationDocumentsDirectory();
-    final imagePath = join(directory.path, 'signature_${_currentUserId}.png');
+    final imagePath = join(
+      directory.path,
+      'signature_${FirebaseAuth.instance.currentUser?.uid}.png',
+    );
     final file = File(imagePath);
     if (await file.exists()) {
       return imagePath;
@@ -251,9 +240,11 @@ class _IREditScreenState extends State<IREditScreen> {
   }
 
   Future<String?> _getSealImagePath() async {
-    if (_currentUserId == null) return null;
     final directory = await getApplicationDocumentsDirectory();
-    final imagePath = join(directory.path, 'seal_${_currentUserId}.png');
+    final imagePath = join(
+      directory.path,
+      'seal_${FirebaseAuth.instance.currentUser?.uid}.png',
+    );
     final file = File(imagePath);
     if (await file.exists()) {
       return imagePath;
@@ -262,33 +253,27 @@ class _IREditScreenState extends State<IREditScreen> {
   }
 
   Future<void> _saveSignatureImage(Uint8List bytes) async {
-    if (_currentUserId == null) return;
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final imagePath = join(directory.path, 'signature_${_currentUserId}.png');
-      final file = File(imagePath);
-      await file.writeAsBytes(bytes);
-      setState(() {
-        _signatureImagePath = imagePath;
-      });
-    } catch (e) {
-      final scaffoldMessenger = ScaffoldMessenger.of(this.context);
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('Error saving signature: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    final directory = await getApplicationDocumentsDirectory();
+    final imagePath = join(
+      directory.path,
+      'signature_${FirebaseAuth.instance.currentUser?.uid}.png',
+    );
+    final file = File(imagePath);
+    await file.writeAsBytes(bytes);
+    setState(() {
+      _signatureImagePath = imagePath;
+    });
   }
 
   Future<void> _saveSealImage(File imageFile) async {
     if (!mounted) return;
-    if (_currentUserId == null) return;
     final scaffoldMessenger = ScaffoldMessenger.of(this.context);
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final localPath = join(directory.path, 'seal_${_currentUserId}.png');
+      final localPath = join(
+        directory.path,
+        'seal_${FirebaseAuth.instance.currentUser?.uid}.png',
+      );
       final localImage = await imageFile.copy(localPath);
       setState(() {
         _sealImagePath = localImage.path;
@@ -463,10 +448,12 @@ class _IREditScreenState extends State<IREditScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF3949AB),
+        elevation: 0,
         title: Text(
           widget.isCreator
               ? 'Edit Inspection Report'
               : 'Review Inspection Report',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
         ),
         actions: [
           if (_isLoading)
@@ -476,12 +463,20 @@ class _IREditScreenState extends State<IREditScreen> {
                 child: CircularProgressIndicator(color: Colors.white),
               ),
             )
-          else if (!_isPDFVisible)
+          else ...[
             IconButton(
               icon: const Icon(Icons.preview),
               onPressed: _generatePDFPreview,
               tooltip: 'Preview PDF',
+              color: Colors.white,
             ),
+            IconButton(
+              icon: const Icon(Icons.print),
+              onPressed: _printPDF,
+              tooltip: 'Print PDF',
+              color: Colors.white,
+            ),
+          ],
         ],
       ),
       body:
@@ -489,25 +484,99 @@ class _IREditScreenState extends State<IREditScreen> {
               ? Column(
                 children: [
                   Expanded(
-                    child:
-                        _pdfPath!.isNotEmpty
-                            ? PDFView(
-                              filePath: _pdfPath!,
-                              enableSwipe: true,
-                              swipeHorizontal: false,
-                              autoSpacing: false,
-                              pageFling: false,
-                              pageSnap: true,
-                              defaultPage: 0,
-                              fitPolicy: FitPolicy.BOTH,
-                              preventLinkNavigation: false,
-                            )
-                            : const Center(
-                              child: Text(
-                                'PDF not available',
-                                style: TextStyle(fontSize: 16),
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child:
+                              _pdfPath!.isNotEmpty
+                                  ? PDFView(
+                                    filePath: _pdfPath!,
+                                    enableSwipe: true,
+                                    swipeHorizontal: false,
+                                    autoSpacing: true,
+                                    pageFling: true,
+                                    pageSnap: true,
+                                    defaultPage: 0,
+                                    fitPolicy: FitPolicy.BOTH,
+                                    preventLinkNavigation: false,
+                                    onRender: (pages) {
+                                      setState(() {
+                                        _totalPages = pages ?? 0;
+                                      });
+                                    },
+                                    onPageChanged: (page, total) {
+                                      setState(() {
+                                        _currentPage = page ?? 0;
+                                      });
+                                    },
+                                    onError: (error) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Error loading PDF: $error',
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    },
+                                    onPageError: (page, error) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Error loading page $page: $error',
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    },
+                                    onViewCreated: (controller) {
+                                      setState(() {
+                                        _pdfViewController = controller;
+                                      });
+                                    },
+                                  )
+                                  : const Center(
+                                    child: Text(
+                                      'PDF not available',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                        ),
+                        if (_isLoading)
+                          Container(
+                            color: Colors.black.withOpacity(0.3),
+                            child: const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Generating PDF...',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                          ),
+                      ],
+                    ),
                   ),
                   Container(
                     decoration: BoxDecoration(
@@ -529,17 +598,19 @@ class _IREditScreenState extends State<IREditScreen> {
                               const Text(
                                 'Recipients',
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.bold,
+                                  color: Color(0xFF3949AB),
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 12),
                               Container(
                                 decoration: BoxDecoration(
                                   border: Border.all(color: Colors.grey[300]!),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.grey[50],
                                 ),
-                                padding: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.all(12),
                                 child: Column(
                                   children: [
                                     Wrap(
@@ -549,37 +620,71 @@ class _IREditScreenState extends State<IREditScreen> {
                                           _recipientEmails
                                               .map(
                                                 (email) => Chip(
-                                                  label: Text(email),
+                                                  label: Text(
+                                                    email,
+                                                    style: const TextStyle(
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
                                                   deleteIcon: const Icon(
                                                     Icons.close,
                                                     size: 18,
+                                                  ),
+                                                  backgroundColor: const Color(
+                                                    0xFF3949AB,
+                                                  ).withOpacity(0.1),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
                                                   ),
                                                   onDeleted:
                                                       () => _removeRecipient(
                                                         email,
                                                       ),
-                                                  backgroundColor: const Color(
-                                                    0xFF3949AB,
-                                                  ).withOpacity(0.1),
                                                 ),
                                               )
                                               .toList(),
                                     ),
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 12),
                                     Row(
                                       children: [
                                         Expanded(
                                           child: TextField(
                                             controller: _recipientController,
                                             focusNode: _recipientFocusNode,
-                                            decoration: const InputDecoration(
+                                            decoration: InputDecoration(
                                               hintText:
                                                   'Type email and press Enter or add comma',
-                                              border: InputBorder.none,
+                                              border: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                borderSide: BorderSide(
+                                                  color: Colors.grey[300]!,
+                                                ),
+                                              ),
+                                              enabledBorder: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                borderSide: BorderSide(
+                                                  color: Colors.grey[300]!,
+                                                ),
+                                              ),
+                                              focusedBorder: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                borderSide: const BorderSide(
+                                                  color: Color(0xFF3949AB),
+                                                ),
+                                              ),
                                               contentPadding:
-                                                  EdgeInsets.symmetric(
-                                                    horizontal: 8,
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
                                                   ),
+                                              filled: true,
+                                              fillColor: Colors.white,
                                             ),
                                             keyboardType:
                                                 TextInputType.emailAddress,
@@ -588,9 +693,11 @@ class _IREditScreenState extends State<IREditScreen> {
                                             },
                                           ),
                                         ),
+                                        const SizedBox(width: 8),
                                         IconButton(
                                           icon: const Icon(
                                             Icons.add_circle_outline,
+                                            color: Color(0xFF3949AB),
                                           ),
                                           onPressed: () {
                                             _addRecipient(
@@ -615,166 +722,116 @@ class _IREditScreenState extends State<IREditScreen> {
                               const SizedBox(height: 16),
                             ],
                             Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                              spacing: 12,
+                              runSpacing: 12,
                               alignment: WrapAlignment.center,
                               children: [
                                 if (!_isLoading) ...[
                                   if (!widget.isCreator) ...[
-                                    SizedBox(
-                                      height: 48,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          setState(() => _isLoading = true);
-                                          try {
-                                            await _saveIR(true);
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(
-                                                this.context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          } finally {
-                                            if (mounted) {
-                                              setState(
-                                                () => _isLoading = false,
-                                              );
-                                            }
-                                          }
-                                        },
-                                        icon: const Icon(
-                                          Icons.check,
-                                          color: Colors.white,
-                                        ),
-                                        label: const Text('Approve Changes'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 24,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      height: 48,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          setState(() => _isLoading = true);
-                                          try {
-                                            await _saveIR(false);
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(
-                                                this.context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          } finally {
-                                            if (mounted) {
-                                              setState(
-                                                () => _isLoading = false,
-                                              );
-                                            }
-                                          }
-                                        },
-                                        icon: const Icon(
-                                          Icons.close,
-                                          color: Colors.white,
-                                        ),
-                                        label: const Text('Reject Changes'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 24,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    SizedBox(
-                                      height: 48,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          if (_recipientEmails.isEmpty) {
+                                    _buildActionButton(
+                                      onPressed: () async {
+                                        setState(() => _isLoading = true);
+                                        try {
+                                          await _saveIR(true);
+                                        } catch (e) {
+                                          if (mounted) {
                                             ScaffoldMessenger.of(
                                               this.context,
                                             ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Please add at least one recipient',
-                                                ),
+                                              SnackBar(
+                                                content: Text('Error: $e'),
                                                 backgroundColor: Colors.red,
                                               ),
                                             );
-                                            return;
                                           }
-                                          setState(() => _isLoading = true);
-                                          try {
-                                            await _saveIR(true);
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(
-                                                this.context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          } finally {
-                                            if (mounted) {
-                                              setState(
-                                                () => _isLoading = false,
-                                              );
-                                            }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
                                           }
-                                        },
-                                        icon: const Icon(
-                                          Icons.save,
-                                          color: Colors.white,
-                                        ),
-                                        label: const Text('Save Changes'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(
-                                            0xFF3949AB,
-                                          ),
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 24,
-                                          ),
-                                        ),
-                                      ),
+                                        }
+                                      },
+                                      icon: Icons.check,
+                                      label: 'Approve Changes',
+                                      backgroundColor: Colors.green,
+                                    ),
+                                    _buildActionButton(
+                                      onPressed: () async {
+                                        setState(() => _isLoading = true);
+                                        try {
+                                          await _saveIR(false);
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              this.context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
+                                          }
+                                        }
+                                      },
+                                      icon: Icons.close,
+                                      label: 'Reject Changes',
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  ] else ...[
+                                    _buildActionButton(
+                                      onPressed: () async {
+                                        if (_recipientEmails.isEmpty) {
+                                          ScaffoldMessenger.of(
+                                            this.context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Please add at least one recipient',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        setState(() => _isLoading = true);
+                                        try {
+                                          await _saveIR(true);
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              this.context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
+                                          }
+                                        }
+                                      },
+                                      icon: Icons.save,
+                                      label: 'Save Changes',
+                                      backgroundColor: const Color(0xFF3949AB),
                                     ),
                                   ],
-                                  SizedBox(
-                                    height: 48,
-                                    child: TextButton.icon(
-                                      onPressed:
-                                          !_isLoading
-                                              ? () => setState(
-                                                () => _isPDFVisible = false,
-                                              )
-                                              : null,
-                                      icon: const Icon(Icons.edit),
-                                      label: const Text('Back to Edit'),
-                                      style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 24,
-                                        ),
-                                      ),
-                                    ),
+                                  _buildActionButton(
+                                    onPressed:
+                                        !_isLoading
+                                            ? () => setState(
+                                              () => _isPDFVisible = false,
+                                            )
+                                            : null,
+                                    icon: Icons.edit,
+                                    label: 'Back to Edit',
+                                    backgroundColor: Colors.grey[700]!,
+                                    isOutlined: true,
                                   ),
                                 ] else
                                   const SizedBox(
@@ -783,28 +840,6 @@ class _IREditScreenState extends State<IREditScreen> {
                                       child: CircularProgressIndicator(),
                                     ),
                                   ),
-                                // Add Print button for creator after successful send
-                                if (widget.isCreator && !_isLoading) ...[
-                                  SizedBox(width: 8), // Spacing between buttons
-                                  SizedBox(
-                                    height: 48,
-                                    child: ElevatedButton.icon(
-                                      onPressed: _printPDF,
-                                      icon: const Icon(
-                                        Icons.print,
-                                        color: Colors.white,
-                                      ),
-                                      label: const Text('Print PDF'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.blueAccent,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 24,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
                               ],
                             ),
                           ],
@@ -816,48 +851,50 @@ class _IREditScreenState extends State<IREditScreen> {
               )
               : Form(
                 key: _formKey,
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Project Info Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF3949AB).withOpacity(0.05),
+                        Colors.white,
+                      ],
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildModernCard(
+                            title: 'Project Information',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Project Information',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
                                   'Project: ${_irData.projectName}',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleMedium,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF3949AB),
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   'Contract No: ${_irData.contractNo}',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleMedium,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF3949AB),
+                                  ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 16),
                                 TextFormField(
                                   initialValue: _irData.irNo,
-                                  decoration: const InputDecoration(
-                                    labelText: 'IR No.',
-                                    border: OutlineInputBorder(),
+                                  decoration: _buildInputDecoration(
+                                    label: 'IR No.',
                                   ),
                                   onChanged: (value) {
                                     _updateIRData(irNo: value);
@@ -866,13 +903,9 @@ class _IREditScreenState extends State<IREditScreen> {
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // BOQ Items Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'BOQ Items',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -880,12 +913,13 @@ class _IREditScreenState extends State<IREditScreen> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      'BOQ Items',
-                                      style:
-                                          Theme.of(
-                                            this.context,
-                                          ).textTheme.titleLarge,
+                                    const Text(
+                                      'Items List',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF3949AB),
+                                      ),
                                     ),
                                     ElevatedButton.icon(
                                       onPressed: _addNewBOQItem,
@@ -896,37 +930,44 @@ class _IREditScreenState extends State<IREditScreen> {
                                           0xFF3949AB,
                                         ),
                                         foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
-                                // Scroll indicator text
                                 Row(
                                   children: [
-                                    Icon(Icons.swipe, color: Colors.grey[600]),
+                                    Icon(
+                                      Icons.swipe,
+                                      color: Colors.grey[600],
+                                      size: 16,
+                                    ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Swipe horizontally to see more',
                                       style: TextStyle(
                                         color: Colors.grey[600],
-                                        fontSize: 14,
+                                        fontSize: 12,
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                // Horizontal scroll indicator
                                 Container(
                                   height: 2,
                                   margin: const EdgeInsets.only(bottom: 8),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Theme.of(this.context).primaryColor,
-                                        Theme.of(
-                                          this.context,
-                                        ).primaryColor.withOpacity(0.1),
+                                        const Color(0xFF3949AB),
+                                        const Color(
+                                          0xFF3949AB,
+                                        ).withOpacity(0.1),
                                       ],
                                     ),
                                   ),
@@ -1016,16 +1057,11 @@ class _IREditScreenState extends State<IREditScreen> {
                                                       child: TextFormField(
                                                         initialValue:
                                                             item.refNo,
-                                                        decoration: const InputDecoration(
-                                                          isDense: true,
-                                                          contentPadding:
-                                                              EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 8,
-                                                              ),
-                                                          border:
-                                                              OutlineInputBorder(),
-                                                        ),
+                                                        decoration:
+                                                            _buildInputDecoration(
+                                                              label: '',
+                                                              isDense: true,
+                                                            ),
                                                         onChanged:
                                                             (value) =>
                                                                 _updateBOQItem(
@@ -1041,16 +1077,11 @@ class _IREditScreenState extends State<IREditScreen> {
                                                       child: TextFormField(
                                                         initialValue:
                                                             item.description,
-                                                        decoration: const InputDecoration(
-                                                          isDense: true,
-                                                          contentPadding:
-                                                              EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 8,
-                                                              ),
-                                                          border:
-                                                              OutlineInputBorder(),
-                                                        ),
+                                                        decoration:
+                                                            _buildInputDecoration(
+                                                              label: '',
+                                                              isDense: true,
+                                                            ),
                                                         onChanged:
                                                             (value) =>
                                                                 _updateBOQItem(
@@ -1066,16 +1097,11 @@ class _IREditScreenState extends State<IREditScreen> {
                                                       width: 80,
                                                       child: TextFormField(
                                                         initialValue: item.unit,
-                                                        decoration: const InputDecoration(
-                                                          isDense: true,
-                                                          contentPadding:
-                                                              EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 8,
-                                                              ),
-                                                          border:
-                                                              OutlineInputBorder(),
-                                                        ),
+                                                        decoration:
+                                                            _buildInputDecoration(
+                                                              label: '',
+                                                              isDense: true,
+                                                            ),
                                                         onChanged:
                                                             (value) =>
                                                                 _updateBOQItem(
@@ -1091,16 +1117,11 @@ class _IREditScreenState extends State<IREditScreen> {
                                                       child: TextFormField(
                                                         initialValue:
                                                             item.quantity,
-                                                        decoration: const InputDecoration(
-                                                          isDense: true,
-                                                          contentPadding:
-                                                              EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 8,
-                                                              ),
-                                                          border:
-                                                              OutlineInputBorder(),
-                                                        ),
+                                                        decoration:
+                                                            _buildInputDecoration(
+                                                              label: '',
+                                                              isDense: true,
+                                                            ),
                                                         onChanged:
                                                             (value) =>
                                                                 _updateBOQItem(
@@ -1117,16 +1138,11 @@ class _IREditScreenState extends State<IREditScreen> {
                                                       child: TextFormField(
                                                         initialValue:
                                                             item.remarks,
-                                                        decoration: const InputDecoration(
-                                                          isDense: true,
-                                                          contentPadding:
-                                                              EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 8,
-                                                              ),
-                                                          border:
-                                                              OutlineInputBorder(),
-                                                        ),
+                                                        decoration:
+                                                            _buildInputDecoration(
+                                                              label: '',
+                                                              isDense: true,
+                                                            ),
                                                         onChanged:
                                                             (value) =>
                                                                 _updateBOQItem(
@@ -1145,8 +1161,8 @@ class _IREditScreenState extends State<IREditScreen> {
                                                         IconButton(
                                                           icon: const Icon(
                                                             Icons.delete,
+                                                            color: Colors.red,
                                                           ),
-                                                          color: Colors.red,
                                                           onPressed: () {
                                                             setState(() {
                                                               _boqItems
@@ -1179,76 +1195,48 @@ class _IREditScreenState extends State<IREditScreen> {
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Additional Details Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'Additional Details',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Additional Details',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _supplierController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Supplier Delivery Note/Date',
-                                    border: OutlineInputBorder(),
+                                  decoration: _buildInputDecoration(
+                                    label: 'Supplier Delivery Note/Date',
                                   ),
                                 ),
                                 const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _manufacturerController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Manufacturer',
-                                    border: OutlineInputBorder(),
+                                  decoration: _buildInputDecoration(
+                                    label: 'Manufacturer',
                                   ),
                                 ),
                                 const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _countryController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Country of Origin',
-                                    border: OutlineInputBorder(),
+                                  decoration: _buildInputDecoration(
+                                    label: 'Country of Origin',
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // MAS/FAT Report Status Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'MAS/FAT Report Status',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'MAS/FAT Report Status',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
                                 DropdownButtonFormField<String>(
                                   value:
                                       _irData.masStatus.isEmpty
                                           ? null
                                           : _irData.masStatus,
-                                  decoration: const InputDecoration(
-                                    labelText: 'MAS Status',
-                                    border: OutlineInputBorder(),
+                                  decoration: _buildInputDecoration(
+                                    label: 'MAS Status',
                                   ),
                                   items: const [
                                     DropdownMenuItem(
@@ -1274,9 +1262,8 @@ class _IREditScreenState extends State<IREditScreen> {
                                       _irData.dtsStatus.isEmpty
                                           ? null
                                           : _irData.dtsStatus,
-                                  decoration: const InputDecoration(
-                                    labelText: 'DTS Status',
-                                    border: OutlineInputBorder(),
+                                  decoration: _buildInputDecoration(
+                                    label: 'DTS Status',
                                   ),
                                   items: const [
                                     DropdownMenuItem(
@@ -1302,9 +1289,8 @@ class _IREditScreenState extends State<IREditScreen> {
                                       _irData.dispatchStatus.isEmpty
                                           ? null
                                           : _irData.dispatchStatus,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Dispatch Clearance Status',
-                                    border: OutlineInputBorder(),
+                                  decoration: _buildInputDecoration(
+                                    label: 'Dispatch Clearance Status',
                                   ),
                                   items: const [
                                     DropdownMenuItem(
@@ -1327,29 +1313,17 @@ class _IREditScreenState extends State<IREditScreen> {
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Engineer's Comments Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: "Engineer's Comments",
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  "Engineer's Comments",
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _commentsController,
                                   maxLines: 3,
-                                  decoration: const InputDecoration(
-                                    border: OutlineInputBorder(),
+                                  decoration: _buildInputDecoration(
+                                    label: '',
                                     hintText: 'Enter comments here...',
                                   ),
                                 ),
@@ -1361,7 +1335,11 @@ class _IREditScreenState extends State<IREditScreen> {
                                   children: [
                                     const Text(
                                       'Inspection Result:',
-                                      style: TextStyle(fontSize: 16),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF3949AB),
+                                      ),
                                     ),
                                     ChoiceChip(
                                       label: const Text('Satisfactory'),
@@ -1369,6 +1347,15 @@ class _IREditScreenState extends State<IREditScreen> {
                                       onSelected: (selected) {
                                         _updateIRData(isSatisfactory: true);
                                       },
+                                      backgroundColor: Colors.grey[200],
+                                      selectedColor: Colors.green[100],
+                                      labelStyle: TextStyle(
+                                        color:
+                                            _irData.isSatisfactory
+                                                ? Colors.green[800]
+                                                : Colors.grey[800],
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                     ChoiceChip(
                                       label: const Text('Unsatisfactory'),
@@ -1376,30 +1363,27 @@ class _IREditScreenState extends State<IREditScreen> {
                                       onSelected: (selected) {
                                         _updateIRData(isSatisfactory: false);
                                       },
+                                      backgroundColor: Colors.grey[200],
+                                      selectedColor: Colors.red[100],
+                                      labelStyle: TextStyle(
+                                        color:
+                                            !_irData.isSatisfactory
+                                                ? Colors.red[800]
+                                                : Colors.grey[800],
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        // Signature Section
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'Signature',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Signature',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
                                 Center(
                                   child: ElevatedButton.icon(
                                     onPressed: _showSignatureOptions,
@@ -1407,76 +1391,35 @@ class _IREditScreenState extends State<IREditScreen> {
                                       _signatureImagePath == null
                                           ? Icons.brush
                                           : Icons.edit,
+                                      color: const Color(0xFF3949AB),
                                     ),
                                     label: Text(
                                       _signatureImagePath == null
                                           ? 'Add Signature'
                                           : 'Change Signature',
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF3949AB),
-                                      foregroundColor: Colors.white,
+                                      style: const TextStyle(
+                                        color: Color(0xFF3949AB),
+                                      ),
                                     ),
                                   ),
                                 ),
                                 if (_signatureImagePath != null)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 16.0),
-                                    child: Image.file(
-                                      File(_signatureImagePath!),
-                                      height: 100,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        // Seal Section
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Seal',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
-                                Center(
-                                  child: ElevatedButton.icon(
-                                    onPressed: _pickSealImage,
-                                    icon: const Icon(Icons.image),
-                                    label: const Text('Add Seal'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF3949AB),
-                                      foregroundColor: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                                if (_sealImagePath != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 16.0),
-                                    child: Image.file(
-                                      File(_sealImagePath!),
-                                      height: 100,
-                                    ),
-                                  ),
-                                if (_sealImagePath != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 16.0),
                                     child: Center(
-                                      child: ElevatedButton.icon(
-                                        onPressed: _deleteSealImage,
-                                        icon: const Icon(Icons.delete),
-                                        label: const Text('Delete Seal'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey[300]!,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(8),
+                                        child: Image.file(
+                                          File(_signatureImagePath!),
+                                          height: 100,
                                         ),
                                       ),
                                     ),
@@ -1484,13 +1427,276 @@ class _IREditScreenState extends State<IREditScreen> {
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 32),
-                      ],
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'Seal',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Center(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _pickSealImage,
+                                    icon: const Icon(
+                                      Icons.image,
+                                      color: Color(0xFF3949AB),
+                                    ),
+                                    label: const Text(
+                                      'Add Seal',
+                                      style: TextStyle(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (_sealImagePath != null) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 16.0),
+                                    child: Center(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey[300]!,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(8),
+                                        child: Image.file(
+                                          File(_sealImagePath!),
+                                          height: 100,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 16.0),
+                                    child: Center(
+                                      child: ElevatedButton.icon(
+                                        onPressed: _deleteSealImage,
+                                        icon: const Icon(
+                                          Icons.delete,
+                                          color: Color(0xFF3949AB),
+                                        ),
+                                        label: const Text(
+                                          'Delete Seal',
+                                          style: TextStyle(
+                                            color: Color(0xFF3949AB),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
+    );
+  }
+
+  Widget _buildModernCard({required String title, required Widget child}) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.white, const Color(0xFF3949AB).withOpacity(0.05)],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3949AB).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _getIconForTitle(title),
+                      color: const Color(0xFF3949AB),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3949AB),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              child,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getIconForTitle(String title) {
+    switch (title) {
+      case 'Project Information':
+        return Icons.business;
+      case 'BOQ Items':
+        return Icons.list_alt;
+      case 'Additional Details':
+        return Icons.description;
+      case 'MAS/FAT Report Status':
+        return Icons.assessment;
+      case "Engineer's Comments":
+        return Icons.comment;
+      case 'Signature':
+        return Icons.draw;
+      case 'Seal':
+        return Icons.verified_user;
+      default:
+        return Icons.info;
+    }
+  }
+
+  Widget _buildActionButton({
+    required VoidCallback? onPressed,
+    required IconData icon,
+    required String label,
+    required Color backgroundColor,
+    bool isOutlined = false,
+  }) {
+    // Define gradient colors based on button type
+    List<Color> gradientColors;
+    Color textColor;
+    Color iconColor;
+    Color borderColor;
+    Color shadowColor;
+
+    if (isOutlined) {
+      gradientColors = [Colors.white, Colors.white];
+      textColor = backgroundColor;
+      iconColor = backgroundColor;
+      borderColor = backgroundColor;
+      shadowColor = backgroundColor.withOpacity(0.2);
+    } else {
+      switch (backgroundColor) {
+        case Colors.green:
+          gradientColors = [const Color(0xFF4CAF50), const Color(0xFF43A047)];
+          textColor = Colors.white;
+          iconColor = Colors.white;
+          borderColor = const Color(0xFF43A047);
+          shadowColor = const Color(0xFF4CAF50).withOpacity(0.3);
+          break;
+        case Colors.red:
+          gradientColors = [const Color(0xFFE53935), const Color(0xFFD32F2F)];
+          textColor = Colors.white;
+          iconColor = Colors.white;
+          borderColor = const Color(0xFFD32F2F);
+          shadowColor = const Color(0xFFE53935).withOpacity(0.3);
+          break;
+        default:
+          gradientColors = [const Color(0xFF3949AB), const Color(0xFF303F9F)];
+          textColor = Colors.white;
+          iconColor = Colors.white;
+          borderColor = const Color(0xFF303F9F);
+          shadowColor = const Color(0xFF3949AB).withOpacity(0.3);
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: isOutlined ? Border.all(color: borderColor, width: 1.5) : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: iconColor, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required String label,
+    String? hintText,
+    bool isDense = false,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hintText,
+      isDense: isDense,
+      contentPadding:
+          isDense
+              ? const EdgeInsets.symmetric(horizontal: 8, vertical: 8)
+              : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF3949AB)),
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      labelStyle: TextStyle(
+        color: Colors.grey[600],
+        fontWeight: FontWeight.w500,
+      ),
+      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
     );
   }
 
@@ -1580,11 +1786,13 @@ class _IREditScreenState extends State<IREditScreen> {
 
   Future<void> _saveSignature(dynamic data) async {
     if (!mounted) return; // Check if the widget is still mounted
-    if (_currentUserId == null) return; // Prevent saving if no user
     final scaffoldMessenger = ScaffoldMessenger.of(this.context);
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final imagePath = join(directory.path, 'signature_${_currentUserId}.png');
+      final imagePath = join(
+        directory.path,
+        'signature_${FirebaseAuth.instance.currentUser?.uid}.png',
+      );
       final file = File(imagePath);
 
       if (data is Uint8List) {
@@ -1611,11 +1819,13 @@ class _IREditScreenState extends State<IREditScreen> {
 
   Future<void> _deleteSignatureImage() async {
     if (!mounted) return; // Check if the widget is still mounted
-    if (_currentUserId == null) return; // Prevent deleting if no user
     final scaffoldMessenger = ScaffoldMessenger.of(this.context);
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final imagePath = join(directory.path, 'signature_${_currentUserId}.png');
+      final imagePath = join(
+        directory.path,
+        'signature_${FirebaseAuth.instance.currentUser?.uid}.png',
+      );
       final file = File(imagePath);
       if (await file.exists()) {
         await file.delete();
@@ -1636,11 +1846,13 @@ class _IREditScreenState extends State<IREditScreen> {
 
   Future<void> _deleteSealImage() async {
     if (!mounted) return;
-    if (_currentUserId == null) return;
     final scaffoldMessenger = ScaffoldMessenger.of(this.context);
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final imagePath = join(directory.path, 'seal_${_currentUserId}.png');
+      final imagePath = join(
+        directory.path,
+        'seal_${FirebaseAuth.instance.currentUser?.uid}.png',
+      );
       final file = File(imagePath);
       if (await file.exists()) {
         await file.delete();

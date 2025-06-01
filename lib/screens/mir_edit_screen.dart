@@ -47,6 +47,9 @@ class _MIREditScreenState extends State<MIREditScreen> {
   String? _signatureImagePath;
   String? _sealImagePath;
   String? _currentUserId;
+  int _totalPages = 0;
+  int _currentPage = 0;
+  PDFViewController? _pdfViewController;
 
   @override
   void initState() {
@@ -294,10 +297,96 @@ class _MIREditScreenState extends State<MIREditScreen> {
   }
 
   Future<void> _loadSealImage() async {
-    final path = await _getSealImagePath();
-    setState(() {
-      _sealImagePath = path;
-    });
+    if (_currentUserId == null) return;
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final imagePath = join(directory.path, 'seal_${_currentUserId}.png');
+      final file = File(imagePath);
+
+      if (await file.exists()) {
+        setState(() {
+          _sealImagePath = imagePath;
+        });
+      } else {
+        setState(() {
+          _sealImagePath = null;
+        });
+      }
+    } catch (e) {
+      print('Error loading seal image: $e');
+      setState(() {
+        _sealImagePath = null;
+      });
+    }
+  }
+
+  Future<void> _deleteSealImage() async {
+    if (!mounted) return;
+    if (_currentUserId == null) return;
+    final scaffoldMessenger = ScaffoldMessenger.of(this.context);
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final imagePath = join(directory.path, 'seal_${_currentUserId}.png');
+      final file = File(imagePath);
+
+      // Force clear the state first
+      setState(() {
+        _sealImagePath = null;
+      });
+
+      // Then delete the file
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      // Verify deletion
+      if (await file.exists()) {
+        throw Exception('Failed to delete seal file');
+      }
+
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text('Seal deleted successfully!')),
+      );
+    } catch (e) {
+      print('Error deleting seal image: $e');
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Failed to delete seal: $e')),
+      );
+      // Reload the state to ensure consistency
+      _loadSealImage();
+    }
+  }
+
+  Future<void> _pickSealImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      try {
+        // Clear the state first
+        setState(() {
+          _sealImagePath = null;
+        });
+
+        // Delete old file if it exists
+        if (_currentUserId != null) {
+          final directory = await getApplicationDocumentsDirectory();
+          final oldPath = join(directory.path, 'seal_${_currentUserId}.png');
+          final oldFile = File(oldPath);
+          if (await oldFile.exists()) {
+            await oldFile.delete();
+          }
+        }
+
+        // Save new file
+        final File imageFile = File(pickedFile.path);
+        await _saveSealImage(imageFile);
+      } catch (e) {
+        print('Error handling seal image: $e');
+        // Reload the state to ensure consistency
+        _loadSealImage();
+      }
+    }
   }
 
   Future<void> _saveSealImage(File imageFile) async {
@@ -307,10 +396,26 @@ class _MIREditScreenState extends State<MIREditScreen> {
     try {
       final directory = await getApplicationDocumentsDirectory();
       final localPath = join(directory.path, 'seal_${_currentUserId}.png');
+
+      // Delete existing file if it exists
+      final existingFile = File(localPath);
+      if (await existingFile.exists()) {
+        await existingFile.delete();
+      }
+
+      // Copy the new file
       final localImage = await imageFile.copy(localPath);
+
+      // Verify the new file exists
+      if (!await localImage.exists()) {
+        throw Exception('Failed to save seal file');
+      }
+
+      // Update state
       setState(() {
         _sealImagePath = localImage.path;
       });
+
       scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text('Seal saved successfully!')),
       );
@@ -319,6 +424,8 @@ class _MIREditScreenState extends State<MIREditScreen> {
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Failed to save seal: $e')),
       );
+      // Reload the state to ensure consistency
+      _loadSealImage();
     }
   }
 
@@ -476,10 +583,12 @@ class _MIREditScreenState extends State<MIREditScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF3949AB),
+        elevation: 0,
         title: Text(
           widget.isCreator
               ? 'Edit Material Inspection Request'
               : 'Review Material Inspection Request',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
         ),
         actions: [
           if (_isLoading)
@@ -489,39 +598,236 @@ class _MIREditScreenState extends State<MIREditScreen> {
                 child: CircularProgressIndicator(color: Colors.white),
               ),
             )
-          else if (!_isPDFVisible)
+          else ...[
             IconButton(
               icon: const Icon(Icons.preview),
               onPressed: _generatePDFPreview,
               tooltip: 'Preview PDF',
+              color: Colors.white,
             ),
+            IconButton(
+              icon: const Icon(Icons.print),
+              onPressed: _printPDF,
+              tooltip: 'Print PDF',
+              color: Colors.white,
+            ),
+          ],
         ],
       ),
       body:
           _isPDFVisible && _pdfPath != null
               ? Column(
                 children: [
+                  // Container(
+                  //   padding: const EdgeInsets.symmetric(
+                  //     horizontal: 16,
+                  //     vertical: 8,
+                  //   ),
+                  //   decoration: BoxDecoration(
+                  //     color: Colors.white,
+                  //     boxShadow: [
+                  //       BoxShadow(
+                  //         color: Colors.black.withOpacity(0.1),
+                  //         blurRadius: 4,
+                  //         offset: const Offset(0, 2),
+                  //       ),
+                  //     ],
+                  //   ),
+                  //   child: Row(
+                  //     children: [
+                  //       IconButton(
+                  //         icon: const Icon(Icons.arrow_back),
+                  //         onPressed:
+                  //             () => setState(() => _isPDFVisible = false),
+                  //         tooltip: 'Back to Edit',
+                  //       ),
+                  //       const SizedBox(width: 8),
+                  //       const Text(
+                  //         'PDF Preview',
+                  //         style: TextStyle(
+                  //           fontSize: 18,
+                  //           fontWeight: FontWeight.bold,
+                  //           color: Color(0xFF3949AB),
+                  //         ),
+                  //       ),
+                  //       const Spacer(),
+                  //       IconButton(
+                  //         icon: const Icon(Icons.refresh),
+                  //         onPressed: _generatePDFPreview,
+                  //         tooltip: 'Refresh Preview',
+                  //       ),
+                  //       IconButton(
+                  //         icon: const Icon(Icons.print),
+                  //         onPressed: _printPDF,
+                  //         tooltip: 'Print PDF',
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
                   Expanded(
-                    child:
-                        _pdfPath!.isNotEmpty
-                            ? PDFView(
-                              filePath: _pdfPath!,
-                              enableSwipe: true,
-                              swipeHorizontal: false,
-                              autoSpacing: false,
-                              pageFling: false,
-                              pageSnap: true,
-                              defaultPage: 0,
-                              fitPolicy: FitPolicy.BOTH,
-                              preventLinkNavigation: false,
-                            )
-                            : const Center(
-                              child: Text(
-                                'PDF not available',
-                                style: TextStyle(fontSize: 16),
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child:
+                              _pdfPath!.isNotEmpty
+                                  ? PDFView(
+                                    filePath: _pdfPath!,
+                                    enableSwipe: true,
+                                    swipeHorizontal: false,
+                                    autoSpacing: true,
+                                    pageFling: true,
+                                    pageSnap: true,
+                                    defaultPage: 0,
+                                    fitPolicy: FitPolicy.BOTH,
+                                    preventLinkNavigation: false,
+                                    onRender: (pages) {
+                                      setState(() {
+                                        _totalPages = pages ?? 0;
+                                      });
+                                    },
+                                    onPageChanged: (page, total) {
+                                      setState(() {
+                                        _currentPage = page ?? 0;
+                                      });
+                                    },
+                                    onError: (error) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Error loading PDF: $error',
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    },
+                                    onPageError: (page, error) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Error loading page $page: $error',
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    },
+                                    onViewCreated: (controller) {
+                                      setState(() {
+                                        _pdfViewController = controller;
+                                      });
+                                    },
+                                  )
+                                  : const Center(
+                                    child: Text(
+                                      'PDF not available',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                        ),
+                        if (_isLoading)
+                          Container(
+                            color: Colors.black.withOpacity(0.3),
+                            child: const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Generating PDF...',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                          ),
+                      ],
+                    ),
                   ),
+                  // Container(
+                  //   padding: const EdgeInsets.symmetric(
+                  //     horizontal: 16,
+                  //     vertical: 8,
+                  //   ),
+                  //   decoration: BoxDecoration(
+                  //     color: Colors.white,
+                  //     boxShadow: [
+                  //       BoxShadow(
+                  //         color: Colors.black.withOpacity(0.1),
+                  //         blurRadius: 4,
+                  //         offset: const Offset(0, -2),
+                  //       ),
+                  //     ],
+                  //   ),
+                  //   // child: Row(
+                  //   //   mainAxisAlignment: MainAxisAlignment.center,
+                  //   //   children: [
+                  //   //     IconButton(
+                  //   //       icon: const Icon(Icons.first_page),
+                  //   //       onPressed:
+                  //   //           _currentPage > 0
+                  //   //               ? () => _pdfViewController?.setPage(0)
+                  //   //               : null,
+                  //   //       tooltip: 'First Page',
+                  //   //     ),
+                  //   //     IconButton(
+                  //   //       icon: const Icon(Icons.chevron_left),
+                  //   //       onPressed:
+                  //   //           _currentPage > 0
+                  //   //               ? () => _pdfViewController?.setPage(
+                  //   //                 _currentPage - 1,
+                  //   //               )
+                  //   //               : null,
+                  //   //       tooltip: 'Previous Page',
+                  //   //     ),
+                  //   //     Container(
+                  //   //       padding: const EdgeInsets.symmetric(horizontal: 16),
+                  //   //       child: Text(
+                  //   //         'Page ${_currentPage + 1} of $_totalPages',
+                  //   //         style: const TextStyle(
+                  //   //           fontSize: 14,
+                  //   //           fontWeight: FontWeight.w500,
+                  //   //         ),
+                  //   //       ),
+                  //   //     ),
+                  //   //     IconButton(
+                  //   //       icon: const Icon(Icons.chevron_right),
+                  //   //       onPressed:
+                  //   //           _currentPage < _totalPages - 1
+                  //   //               ? () => _pdfViewController?.setPage(
+                  //   //                 _currentPage + 1,
+                  //   //               )
+                  //   //               : null,
+                  //   //       tooltip: 'Next Page',
+                  //   //     ),
+                  //   //     IconButton(
+                  //   //       icon: const Icon(Icons.last_page),
+                  //   //       onPressed:
+                  //   //           _currentPage < _totalPages - 1
+                  //   //               ? () => _pdfViewController?.setPage(
+                  //   //                 _totalPages - 1,
+                  //   //               )
+                  //   //               : null,
+                  //   //       tooltip: 'Last Page',
+                  //   //     ),
+                  //   //   ],
+                  //   // ),
+                  // ),
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -542,17 +848,19 @@ class _MIREditScreenState extends State<MIREditScreen> {
                               const Text(
                                 'Recipients',
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.bold,
+                                  color: Color(0xFF3949AB),
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 12),
                               Container(
                                 decoration: BoxDecoration(
                                   border: Border.all(color: Colors.grey[300]!),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.grey[50],
                                 ),
-                                padding: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.all(12),
                                 child: Column(
                                   children: [
                                     Wrap(
@@ -562,37 +870,71 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                           _recipientEmails
                                               .map(
                                                 (email) => Chip(
-                                                  label: Text(email),
+                                                  label: Text(
+                                                    email,
+                                                    style: const TextStyle(
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
                                                   deleteIcon: const Icon(
                                                     Icons.close,
                                                     size: 18,
+                                                  ),
+                                                  backgroundColor: const Color(
+                                                    0xFF3949AB,
+                                                  ).withOpacity(0.1),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
                                                   ),
                                                   onDeleted:
                                                       () => _removeRecipient(
                                                         email,
                                                       ),
-                                                  backgroundColor: const Color(
-                                                    0xFF3949AB,
-                                                  ).withOpacity(0.1),
                                                 ),
                                               )
                                               .toList(),
                                     ),
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 12),
                                     Row(
                                       children: [
                                         Expanded(
                                           child: TextField(
                                             controller: _recipientController,
                                             focusNode: _recipientFocusNode,
-                                            decoration: const InputDecoration(
+                                            decoration: InputDecoration(
                                               hintText:
                                                   'Type email and press Enter or add comma',
-                                              border: InputBorder.none,
+                                              border: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                borderSide: BorderSide(
+                                                  color: Colors.grey[300]!,
+                                                ),
+                                              ),
+                                              enabledBorder: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                borderSide: BorderSide(
+                                                  color: Colors.grey[300]!,
+                                                ),
+                                              ),
+                                              focusedBorder: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                borderSide: const BorderSide(
+                                                  color: Color(0xFF3949AB),
+                                                ),
+                                              ),
                                               contentPadding:
-                                                  EdgeInsets.symmetric(
-                                                    horizontal: 8,
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
                                                   ),
+                                              filled: true,
+                                              fillColor: Colors.white,
                                             ),
                                             keyboardType:
                                                 TextInputType.emailAddress,
@@ -601,9 +943,11 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                             },
                                           ),
                                         ),
+                                        const SizedBox(width: 8),
                                         IconButton(
                                           icon: const Icon(
                                             Icons.add_circle_outline,
+                                            color: Color(0xFF3949AB),
                                           ),
                                           onPressed: () {
                                             _addRecipient(
@@ -628,166 +972,116 @@ class _MIREditScreenState extends State<MIREditScreen> {
                               const SizedBox(height: 16),
                             ],
                             Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                              spacing: 12,
+                              runSpacing: 12,
                               alignment: WrapAlignment.center,
                               children: [
                                 if (!_isLoading) ...[
                                   if (!widget.isCreator) ...[
-                                    SizedBox(
-                                      height: 48,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          setState(() => _isLoading = true);
-                                          try {
-                                            await _saveMIR(true);
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(
-                                                this.context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          } finally {
-                                            if (mounted) {
-                                              setState(
-                                                () => _isLoading = false,
-                                              );
-                                            }
-                                          }
-                                        },
-                                        icon: const Icon(
-                                          Icons.check,
-                                          color: Colors.white,
-                                        ),
-                                        label: const Text('Approve Changes'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 24,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      height: 48,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          setState(() => _isLoading = true);
-                                          try {
-                                            await _saveMIR(false);
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(
-                                                this.context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          } finally {
-                                            if (mounted) {
-                                              setState(
-                                                () => _isLoading = false,
-                                              );
-                                            }
-                                          }
-                                        },
-                                        icon: const Icon(
-                                          Icons.close,
-                                          color: Colors.white,
-                                        ),
-                                        label: const Text('Reject Changes'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 24,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    SizedBox(
-                                      height: 48,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          if (_recipientEmails.isEmpty) {
+                                    _buildActionButton(
+                                      onPressed: () async {
+                                        setState(() => _isLoading = true);
+                                        try {
+                                          await _saveMIR(true);
+                                        } catch (e) {
+                                          if (mounted) {
                                             ScaffoldMessenger.of(
                                               this.context,
                                             ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Please add at least one recipient',
-                                                ),
+                                              SnackBar(
+                                                content: Text('Error: $e'),
                                                 backgroundColor: Colors.red,
                                               ),
                                             );
-                                            return;
                                           }
-                                          setState(() => _isLoading = true);
-                                          try {
-                                            await _saveMIR(true);
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(
-                                                this.context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          } finally {
-                                            if (mounted) {
-                                              setState(
-                                                () => _isLoading = false,
-                                              );
-                                            }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
                                           }
-                                        },
-                                        icon: const Icon(
-                                          Icons.save,
-                                          color: Colors.white,
-                                        ),
-                                        label: const Text('Save Changes'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(
-                                            0xFF3949AB,
-                                          ),
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 24,
-                                          ),
-                                        ),
-                                      ),
+                                        }
+                                      },
+                                      icon: Icons.check,
+                                      label: 'Approve Changes',
+                                      backgroundColor: Colors.green,
+                                    ),
+                                    _buildActionButton(
+                                      onPressed: () async {
+                                        setState(() => _isLoading = true);
+                                        try {
+                                          await _saveMIR(false);
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              this.context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
+                                          }
+                                        }
+                                      },
+                                      icon: Icons.close,
+                                      label: 'Reject Changes',
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  ] else ...[
+                                    _buildActionButton(
+                                      onPressed: () async {
+                                        if (_recipientEmails.isEmpty) {
+                                          ScaffoldMessenger.of(
+                                            this.context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Please add at least one recipient',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        setState(() => _isLoading = true);
+                                        try {
+                                          await _saveMIR(true);
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              this.context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
+                                          }
+                                        }
+                                      },
+                                      icon: Icons.save,
+                                      label: 'Save Changes',
+                                      backgroundColor: const Color(0xFF3949AB),
                                     ),
                                   ],
-                                  SizedBox(
-                                    height: 48,
-                                    child: TextButton.icon(
-                                      onPressed:
-                                          !_isLoading
-                                              ? () => setState(
-                                                () => _isPDFVisible = false,
-                                              )
-                                              : null,
-                                      icon: const Icon(Icons.edit),
-                                      label: const Text('Back to Edit'),
-                                      style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 24,
-                                        ),
-                                      ),
-                                    ),
+                                  _buildActionButton(
+                                    onPressed:
+                                        !_isLoading
+                                            ? () => setState(
+                                              () => _isPDFVisible = false,
+                                            )
+                                            : null,
+                                    icon: Icons.edit,
+                                    label: 'Back to Edit',
+                                    backgroundColor: Colors.grey[700]!,
+                                    isOutlined: true,
                                   ),
                                 ] else
                                   const SizedBox(
@@ -798,28 +1092,15 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                   ),
                               ],
                             ),
-                            // Add Print button for creator after successful send
-                            if (widget.isCreator && !_isLoading) ...[
-                              SizedBox(width: 8), // Spacing between buttons
-                              SizedBox(
-                                height: 48,
-                                child: ElevatedButton.icon(
-                                  onPressed: _printPDF,
-                                  icon: const Icon(
-                                    Icons.print,
-                                    color: Colors.white,
-                                  ),
-                                  label: const Text('Print PDF'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blueAccent,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 24,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            // if (widget.isCreator && !_isLoading) ...[
+                            //   const SizedBox(height: 12),
+                            //   _buildActionButton(
+                            //     onPressed: _printPDF,
+                            //     icon: Icons.print,
+                            //     label: 'Print PDF',
+                            //     backgroundColor: Colors.blueAccent,
+                            //   ),
+                            // ],
                           ],
                         ),
                       ),
@@ -829,48 +1110,65 @@ class _MIREditScreenState extends State<MIREditScreen> {
               )
               : Form(
                 key: _formKey,
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Project Info Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF3949AB).withOpacity(0.05),
+                        Colors.white,
+                      ],
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildModernCard(
+                            title: 'Project Information',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Project Information',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
                                   'Project: ${_mirData.projectName}',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleMedium,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF3949AB),
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   'Contract No: ${_mirData.contractNo}',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleMedium,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF3949AB),
+                                  ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 16),
                                 TextFormField(
                                   initialValue: _mirData.mirNo,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'MIR No.',
-                                    border: OutlineInputBorder(),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
                                   ),
                                   onChanged: (value) {
                                     _updateMIRData(mirNo: value);
@@ -879,13 +1177,9 @@ class _MIREditScreenState extends State<MIREditScreen> {
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // BOQ Items Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'BOQ Items',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -893,12 +1187,13 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      'BOQ Items',
-                                      style:
-                                          Theme.of(
-                                            this.context,
-                                          ).textTheme.titleLarge,
+                                    const Text(
+                                      'Items List',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF3949AB),
+                                      ),
                                     ),
                                     ElevatedButton.icon(
                                       onPressed: _addNewBOQItem,
@@ -909,37 +1204,44 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                           0xFF3949AB,
                                         ),
                                         foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
-                                // Scroll indicator text
                                 Row(
                                   children: [
-                                    Icon(Icons.swipe, color: Colors.grey[600]),
+                                    Icon(
+                                      Icons.swipe,
+                                      color: Colors.grey[600],
+                                      size: 16,
+                                    ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Swipe horizontally to see more',
                                       style: TextStyle(
                                         color: Colors.grey[600],
-                                        fontSize: 14,
+                                        fontSize: 12,
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                // Horizontal scroll indicator
                                 Container(
                                   height: 2,
                                   margin: const EdgeInsets.only(bottom: 8),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Theme.of(this.context).primaryColor,
-                                        Theme.of(
-                                          this.context,
-                                        ).primaryColor.withOpacity(0.1),
+                                        const Color(0xFF3949AB),
+                                        const Color(
+                                          0xFF3949AB,
+                                        ).withOpacity(0.1),
                                       ],
                                     ),
                                   ),
@@ -1029,15 +1331,44 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                                       child: TextFormField(
                                                         initialValue:
                                                             item.refNo,
-                                                        decoration: const InputDecoration(
+                                                        decoration: InputDecoration(
                                                           isDense: true,
                                                           contentPadding:
-                                                              EdgeInsets.symmetric(
+                                                              const EdgeInsets.symmetric(
                                                                 horizontal: 8,
                                                                 vertical: 8,
                                                               ),
-                                                          border:
-                                                              OutlineInputBorder(),
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          enabledBorder:
+                                                              OutlineInputBorder(
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      8,
+                                                                    ),
+                                                                borderSide:
+                                                                    BorderSide(
+                                                                      color:
+                                                                          Colors
+                                                                              .grey[300]!,
+                                                                    ),
+                                                              ),
+                                                          focusedBorder: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                                  color: Color(
+                                                                    0xFF3949AB,
+                                                                  ),
+                                                                ),
+                                                          ),
                                                         ),
                                                         onChanged:
                                                             (value) =>
@@ -1054,15 +1385,44 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                                       child: TextFormField(
                                                         initialValue:
                                                             item.description,
-                                                        decoration: const InputDecoration(
+                                                        decoration: InputDecoration(
                                                           isDense: true,
                                                           contentPadding:
-                                                              EdgeInsets.symmetric(
+                                                              const EdgeInsets.symmetric(
                                                                 horizontal: 8,
                                                                 vertical: 8,
                                                               ),
-                                                          border:
-                                                              OutlineInputBorder(),
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          enabledBorder:
+                                                              OutlineInputBorder(
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      8,
+                                                                    ),
+                                                                borderSide:
+                                                                    BorderSide(
+                                                                      color:
+                                                                          Colors
+                                                                              .grey[300]!,
+                                                                    ),
+                                                              ),
+                                                          focusedBorder: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                                  color: Color(
+                                                                    0xFF3949AB,
+                                                                  ),
+                                                                ),
+                                                          ),
                                                         ),
                                                         onChanged:
                                                             (value) =>
@@ -1079,15 +1439,44 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                                       width: 80,
                                                       child: TextFormField(
                                                         initialValue: item.unit,
-                                                        decoration: const InputDecoration(
+                                                        decoration: InputDecoration(
                                                           isDense: true,
                                                           contentPadding:
-                                                              EdgeInsets.symmetric(
+                                                              const EdgeInsets.symmetric(
                                                                 horizontal: 8,
                                                                 vertical: 8,
                                                               ),
-                                                          border:
-                                                              OutlineInputBorder(),
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          enabledBorder:
+                                                              OutlineInputBorder(
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      8,
+                                                                    ),
+                                                                borderSide:
+                                                                    BorderSide(
+                                                                      color:
+                                                                          Colors
+                                                                              .grey[300]!,
+                                                                    ),
+                                                              ),
+                                                          focusedBorder: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                                  color: Color(
+                                                                    0xFF3949AB,
+                                                                  ),
+                                                                ),
+                                                          ),
                                                         ),
                                                         onChanged:
                                                             (value) =>
@@ -1104,15 +1493,44 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                                       child: TextFormField(
                                                         initialValue:
                                                             item.quantity,
-                                                        decoration: const InputDecoration(
+                                                        decoration: InputDecoration(
                                                           isDense: true,
                                                           contentPadding:
-                                                              EdgeInsets.symmetric(
+                                                              const EdgeInsets.symmetric(
                                                                 horizontal: 8,
                                                                 vertical: 8,
                                                               ),
-                                                          border:
-                                                              OutlineInputBorder(),
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          enabledBorder:
+                                                              OutlineInputBorder(
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      8,
+                                                                    ),
+                                                                borderSide:
+                                                                    BorderSide(
+                                                                      color:
+                                                                          Colors
+                                                                              .grey[300]!,
+                                                                    ),
+                                                              ),
+                                                          focusedBorder: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                                  color: Color(
+                                                                    0xFF3949AB,
+                                                                  ),
+                                                                ),
+                                                          ),
                                                         ),
                                                         onChanged:
                                                             (value) =>
@@ -1130,15 +1548,44 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                                       child: TextFormField(
                                                         initialValue:
                                                             item.remarks,
-                                                        decoration: const InputDecoration(
+                                                        decoration: InputDecoration(
                                                           isDense: true,
                                                           contentPadding:
-                                                              EdgeInsets.symmetric(
+                                                              const EdgeInsets.symmetric(
                                                                 horizontal: 8,
                                                                 vertical: 8,
                                                               ),
-                                                          border:
-                                                              OutlineInputBorder(),
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          enabledBorder:
+                                                              OutlineInputBorder(
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      8,
+                                                                    ),
+                                                                borderSide:
+                                                                    BorderSide(
+                                                                      color:
+                                                                          Colors
+                                                                              .grey[300]!,
+                                                                    ),
+                                                              ),
+                                                          focusedBorder: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                                  color: Color(
+                                                                    0xFF3949AB,
+                                                                  ),
+                                                                ),
+                                                          ),
                                                         ),
                                                         onChanged:
                                                             (value) =>
@@ -1158,8 +1605,8 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                                         IconButton(
                                                           icon: const Icon(
                                                             Icons.delete,
+                                                            color: Colors.red,
                                                           ),
-                                                          color: Colors.red,
                                                           onPressed: () {
                                                             setState(() {
                                                               _boqItems
@@ -1192,76 +1639,108 @@ class _MIREditScreenState extends State<MIREditScreen> {
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Additional Details Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'Additional Details',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Additional Details',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _supplierController,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'Supplier Delivery Note/Date',
-                                    border: OutlineInputBorder(),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _manufacturerController,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'Manufacturer',
-                                    border: OutlineInputBorder(),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _countryController,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'Country of Origin',
-                                    border: OutlineInputBorder(),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // MAS/FAT Report Status Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'MAS/FAT Report Status',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'MAS/FAT Report Status',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
                                 DropdownButtonFormField<String>(
                                   value:
                                       _mirData.masStatus.isEmpty
                                           ? null
                                           : _mirData.masStatus,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'MAS Status',
-                                    border: OutlineInputBorder(),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
                                   ),
                                   items: const [
                                     DropdownMenuItem(
@@ -1287,9 +1766,23 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                       _mirData.dtsStatus.isEmpty
                                           ? null
                                           : _mirData.dtsStatus,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'DTS Status',
-                                    border: OutlineInputBorder(),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
                                   ),
                                   items: const [
                                     DropdownMenuItem(
@@ -1315,9 +1808,23 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                       _mirData.dispatchStatus.isEmpty
                                           ? null
                                           : _mirData.dispatchStatus,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'Dispatch Clearance Status',
-                                    border: OutlineInputBorder(),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
                                   ),
                                   items: const [
                                     DropdownMenuItem(
@@ -1340,29 +1847,31 @@ class _MIREditScreenState extends State<MIREditScreen> {
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Engineer's Comments Card
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: "Engineer's Comments",
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  "Engineer's Comments",
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _commentsController,
                                   maxLines: 3,
-                                  decoration: const InputDecoration(
-                                    border: OutlineInputBorder(),
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
                                     hintText: 'Enter comments here...',
                                   ),
                                 ),
@@ -1374,7 +1883,11 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                   children: [
                                     const Text(
                                       'Inspection Result:',
-                                      style: TextStyle(fontSize: 16),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF3949AB),
+                                      ),
                                     ),
                                     ChoiceChip(
                                       label: const Text('Satisfactory'),
@@ -1382,6 +1895,15 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                       onSelected: (selected) {
                                         _updateMIRData(isSatisfactory: true);
                                       },
+                                      backgroundColor: Colors.grey[200],
+                                      selectedColor: Colors.green[100],
+                                      labelStyle: TextStyle(
+                                        color:
+                                            _mirData.isSatisfactory
+                                                ? Colors.green[800]
+                                                : Colors.grey[800],
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                     ChoiceChip(
                                       label: const Text('Unsatisfactory'),
@@ -1389,30 +1911,27 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                       onSelected: (selected) {
                                         _updateMIRData(isSatisfactory: false);
                                       },
+                                      backgroundColor: Colors.grey[200],
+                                      selectedColor: Colors.red[100],
+                                      labelStyle: TextStyle(
+                                        color:
+                                            !_mirData.isSatisfactory
+                                                ? Colors.red[800]
+                                                : Colors.grey[800],
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        // Signature Section
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'Signature',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Signature',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
                                 Center(
                                   child: ElevatedButton.icon(
                                     onPressed: _showSignatureOptions,
@@ -1420,75 +1939,35 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                       _signatureImagePath == null
                                           ? Icons.brush
                                           : Icons.edit,
+                                      color: Color(0xFF3949AB),
                                     ),
                                     label: Text(
                                       _signatureImagePath == null
                                           ? 'Add Signature'
                                           : 'Change Signature',
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF3949AB),
-                                      foregroundColor: Colors.white,
+                                      style: const TextStyle(
+                                        color: Color(0xFF3949AB),
+                                      ),
                                     ),
                                   ),
                                 ),
                                 if (_signatureImagePath != null)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 16.0),
-                                    child: Image.file(
-                                      File(_signatureImagePath!),
-                                      height: 100,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Seal Section
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Seal',
-                                  style:
-                                      Theme.of(
-                                        this.context,
-                                      ).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 16),
-                                Center(
-                                  child: ElevatedButton.icon(
-                                    onPressed: _pickSealImage,
-                                    icon: const Icon(Icons.image),
-                                    label: const Text('Add Seal'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF3949AB),
-                                      foregroundColor: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                                if (_sealImagePath != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 16.0),
-                                    child: Image.file(
-                                      File(_sealImagePath!),
-                                      height: 100,
-                                    ),
-                                  ),
-                                if (_sealImagePath != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 16.0),
                                     child: Center(
-                                      child: ElevatedButton.icon(
-                                        onPressed: _deleteSealImage,
-                                        icon: const Icon(Icons.delete),
-                                        label: const Text('Delete Seal'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey[300]!,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(8),
+                                        child: Image.file(
+                                          File(_signatureImagePath!),
+                                          height: 100,
                                         ),
                                       ),
                                     ),
@@ -1496,14 +1975,325 @@ class _MIREditScreenState extends State<MIREditScreen> {
                               ],
                             ),
                           ),
-                        ),
-
-                        const SizedBox(height: 32),
-                      ],
+                          const SizedBox(height: 16),
+                          _buildModernCard(
+                            title: 'Seal',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Center(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _pickSealImage,
+                                    icon: const Icon(
+                                      Icons.image,
+                                      color: Color(0xFF3949AB),
+                                    ),
+                                    label: const Text(
+                                      'Add Seal',
+                                      style: TextStyle(
+                                        color: Color(0xFF3949AB),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (_sealImagePath != null) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 16.0),
+                                    child: Center(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey[300]!,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(8),
+                                        child: Image.file(
+                                          File(_sealImagePath!),
+                                          height: 100,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 16.0),
+                                    child: Center(
+                                      child: ElevatedButton.icon(
+                                        onPressed: _deleteSealImage,
+                                        icon: const Icon(
+                                          Icons.delete,
+                                          color: Color(0xFF3949AB),
+                                        ),
+                                        label: const Text(
+                                          'Delete Seal',
+                                          style: TextStyle(
+                                            color: Color(0xFF3949AB),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
+    );
+  }
+
+  Widget _buildModernCard({required String title, required Widget child}) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.white, const Color(0xFF3949AB).withOpacity(0.05)],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3949AB).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _getIconForTitle(title),
+                      color: const Color(0xFF3949AB),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3949AB),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              child,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getIconForTitle(String title) {
+    switch (title) {
+      case 'Project Information':
+        return Icons.business;
+      case 'BOQ Items':
+        return Icons.list_alt;
+      case 'Additional Details':
+        return Icons.description;
+      case 'MAS/FAT Report Status':
+        return Icons.assessment;
+      case "Engineer's Comments":
+        return Icons.comment;
+      case 'Signature':
+        return Icons.draw;
+      case 'Seal':
+        return Icons.verified_user;
+      default:
+        return Icons.info;
+    }
+  }
+
+  Widget _buildActionButton({
+    required VoidCallback? onPressed,
+    required IconData icon,
+    required String label,
+    required Color backgroundColor,
+    bool isOutlined = false,
+  }) {
+    // Define gradient colors based on button type
+    List<Color> gradientColors;
+    Color textColor;
+    Color iconColor;
+    Color borderColor;
+    Color shadowColor;
+
+    if (isOutlined) {
+      gradientColors = [Colors.white, Colors.white];
+      textColor = backgroundColor;
+      iconColor = backgroundColor;
+      borderColor = backgroundColor;
+      shadowColor = backgroundColor.withOpacity(0.2);
+    } else {
+      switch (backgroundColor) {
+        case Colors.green:
+          gradientColors = [const Color(0xFF4CAF50), const Color(0xFF43A047)];
+          textColor = Colors.white;
+          iconColor = Colors.white;
+          borderColor = const Color(0xFF43A047);
+          shadowColor = const Color(0xFF4CAF50).withOpacity(0.3);
+          break;
+        case Colors.red:
+          gradientColors = [const Color(0xFFE53935), const Color(0xFFD32F2F)];
+          textColor = Colors.white;
+          iconColor = Colors.white;
+          borderColor = const Color(0xFFD32F2F);
+          shadowColor = const Color(0xFFE53935).withOpacity(0.3);
+          break;
+        default:
+          gradientColors = [const Color(0xFF3949AB), const Color(0xFF303F9F)];
+          textColor = Colors.white;
+          iconColor = Colors.white;
+          borderColor = const Color(0xFF303F9F);
+          shadowColor = const Color(0xFF3949AB).withOpacity(0.3);
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: isOutlined ? Border.all(color: borderColor, width: 1.5) : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: iconColor, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String status) {
+    Color chipColor;
+    Color textColor;
+    IconData icon;
+
+    switch (status.toLowerCase()) {
+      case 'approved':
+        chipColor = Colors.green[100]!;
+        textColor = Colors.green[800]!;
+        icon = Icons.check_circle;
+        break;
+      case 'pending':
+        chipColor = Colors.orange[100]!;
+        textColor = Colors.orange[800]!;
+        icon = Icons.pending;
+        break;
+      case 'rejected':
+        chipColor = Colors.red[100]!;
+        textColor = Colors.red[800]!;
+        icon = Icons.cancel;
+        break;
+      default:
+        chipColor = Colors.grey[100]!;
+        textColor = Colors.grey[800]!;
+        icon = Icons.help;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: chipColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: textColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            status.toUpperCase(),
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required String label,
+    String? hintText,
+    Widget? prefixIcon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hintText,
+      prefixIcon: prefixIcon,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF3949AB)),
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      labelStyle: TextStyle(
+        color: Colors.grey[600],
+        fontWeight: FontWeight.w500,
+      ),
+      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
     );
   }
 
@@ -1590,41 +2380,6 @@ class _MIREditScreenState extends State<MIREditScreen> {
       print('Error deleting signature image: $e');
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Failed to delete signature.')),
-      );
-    }
-  }
-
-  Future<void> _pickSealImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      final File imageFile = File(pickedFile.path);
-      await _saveSealImage(imageFile);
-    }
-  }
-
-  Future<void> _deleteSealImage() async {
-    if (!mounted) return;
-    if (_currentUserId == null) return;
-    final scaffoldMessenger = ScaffoldMessenger.of(this.context);
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final imagePath = join(directory.path, 'seal_${_currentUserId}.png');
-      final file = File(imagePath);
-      if (await file.exists()) {
-        await file.delete();
-        setState(() {
-          _sealImagePath = null;
-        });
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('Seal deleted successfully!')),
-        );
-      }
-    } catch (e) {
-      print('Error deleting seal image: $e');
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text('Failed to delete seal: $e')),
       );
     }
   }
