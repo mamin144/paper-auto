@@ -71,7 +71,9 @@ class HomeDrawer extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => ApprovalRequestsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => ApprovalRequestsScreen(),
+                  ),
                 );
               },
               child: Row(
@@ -88,10 +90,10 @@ class HomeDrawer extends StatelessWidget {
             // Add Manage Signature button
             TextButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SignatureScreen()),
-                );
+                // Navigator.push(
+                //   context,
+                //   MaterialPageRoute(builder: (context) => SignatureScreen()),
+                // );
               },
               child: Row(
                 children: [
