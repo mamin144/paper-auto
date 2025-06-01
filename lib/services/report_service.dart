@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/mir_data.dart';
 import '../models/ir_data.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart';
 
 class ReportService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -17,7 +18,9 @@ class ReportService {
 
   ReportService() {
     if (!dotenv.isInitialized) {
-      throw Exception('Environment variables not loaded. Call await dotenv.load() before creating ReportService.');
+      throw Exception(
+        'Environment variables not loaded. Call await dotenv.load() before creating ReportService.',
+      );
     }
   }
 
@@ -73,10 +76,11 @@ class ReportService {
       }
 
       // Get recipient user ID
-      final recipientQuery = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: recipientEmail)
-          .get();
+      final recipientQuery =
+          await _firestore
+              .collection('users')
+              .where('email', isEqualTo: recipientEmail)
+              .get();
 
       if (recipientQuery.docs.isEmpty) {
         throw Exception('Recipient not found');
@@ -121,7 +125,9 @@ class ReportService {
       }
 
       // If not in Firestore, try Firebase Storage
-      final ref = FirebaseStorage.instance.ref().child('$documentType/$pdfId.pdf');
+      final ref = FirebaseStorage.instance.ref().child(
+        '$documentType/$pdfId.pdf',
+      );
       await ref.writeToFile(file);
       return path;
     } catch (e) {
@@ -132,10 +138,11 @@ class ReportService {
   Future<String> generateMIR(Map<String, dynamic> project) async {
     final personalInfo = project['personalInfo'] as Map<String, dynamic>;
     final projectDetails = project['projectDetails'] as Map<String, dynamic>;
-    final projectDescription = project['projectDescription'] as Map<String, dynamic>;
+    final projectDescription =
+        project['projectDescription'] as Map<String, dynamic>;
 
     final pdf = pw.Document();
-    
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -263,10 +270,13 @@ class ReportService {
                   ),
                   // Empty row for data
                   pw.TableRow(
-                    children: List.generate(5, (index) => pw.Padding(
-                      padding: pw.EdgeInsets.all(5),
-                      child: pw.Text(''),
-                    )),
+                    children: List.generate(
+                      5,
+                      (index) => pw.Padding(
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Text(''),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -279,7 +289,9 @@ class ReportService {
                     children: [
                       pw.Padding(
                         padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('MAS/FAT Report/Dispatch Clearance - Approvals'),
+                        child: pw.Text(
+                          'MAS/FAT Report/Dispatch Clearance - Approvals',
+                        ),
                       ),
                       pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -355,7 +367,9 @@ class ReportService {
                   children: [
                     pw.Text("Engineer's Comments:"),
                     pw.SizedBox(height: 10),
-                    pw.Text('The above materials have been inspected on site/store and found at time of inspection to be:'),
+                    pw.Text(
+                      'The above materials have been inspected on site/store and found at time of inspection to be:',
+                    ),
                     pw.Row(
                       children: [
                         pw.Text('Satisfactory '),
@@ -426,7 +440,8 @@ class ReportService {
     );
 
     final directory = await getTemporaryDirectory();
-    final outputPath = '${directory.path}/MIR_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final outputPath =
+        '${directory.path}/MIR_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File(outputPath);
     await file.writeAsBytes(await pdf.save());
     return outputPath;
@@ -435,41 +450,54 @@ class ReportService {
   Future<String> generateIR(Map<String, dynamic> project) async {
     final personalInfo = project['personalInfo'] as Map<String, dynamic>;
     final projectDetails = project['projectDetails'] as Map<String, dynamic>;
-    final projectDescription = project['projectDescription'] as Map<String, dynamic>;
+    final projectDescription =
+        project['projectDescription'] as Map<String, dynamic>;
 
     final pdf = pw.Document();
-    
+
     pdf.addPage(
       pw.Page(
-        build: (pw.Context context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text('Inspection Report', style: pw.TextStyle(fontSize: 24)),
-            pw.SizedBox(height: 20),
-            pw.Text('Project Information', style: pw.TextStyle(fontSize: 18)),
-            pw.Text('Project Name: ${projectDetails['projectName']}'),
-            pw.Text('Project Area: ${projectDetails['projectArea']}'),
-            pw.Text('Project Type: ${projectDetails['projectType']}'),
-            pw.SizedBox(height: 20),
-            pw.Text('Project Details', style: pw.TextStyle(fontSize: 18)),
-            pw.Text('Villas: ${projectDescription['village']}'),
-            pw.Text('Buildings: ${projectDescription['building']}'),
-            pw.Text('Malls: ${projectDescription['malls']}'),
-            pw.Text('Parking: ${projectDescription['parking']}'),
-            pw.SizedBox(height: 20),
-            pw.Text('Contact Information', style: pw.TextStyle(fontSize: 18)),
-            pw.Text('Name: ${personalInfo['firstName']} ${personalInfo['lastName']}'),
-            pw.Text('Email: ${personalInfo['email']}'),
-            pw.Text('Phone: ${personalInfo['phone']}'),
-            pw.SizedBox(height: 20),
-            pw.Text('Inspection Date: ${DateTime.now().toString().split(' ')[0]}'),
-          ],
-        ),
+        build:
+            (pw.Context context) => pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Inspection Report', style: pw.TextStyle(fontSize: 24)),
+                pw.SizedBox(height: 20),
+                pw.Text(
+                  'Project Information',
+                  style: pw.TextStyle(fontSize: 18),
+                ),
+                pw.Text('Project Name: ${projectDetails['projectName']}'),
+                pw.Text('Project Area: ${projectDetails['projectArea']}'),
+                pw.Text('Project Type: ${projectDetails['projectType']}'),
+                pw.SizedBox(height: 20),
+                pw.Text('Project Details', style: pw.TextStyle(fontSize: 18)),
+                pw.Text('Villas: ${projectDescription['village']}'),
+                pw.Text('Buildings: ${projectDescription['building']}'),
+                pw.Text('Malls: ${projectDescription['malls']}'),
+                pw.Text('Parking: ${projectDescription['parking']}'),
+                pw.SizedBox(height: 20),
+                pw.Text(
+                  'Contact Information',
+                  style: pw.TextStyle(fontSize: 18),
+                ),
+                pw.Text(
+                  'Name: ${personalInfo['firstName']} ${personalInfo['lastName']}',
+                ),
+                pw.Text('Email: ${personalInfo['email']}'),
+                pw.Text('Phone: ${personalInfo['phone']}'),
+                pw.SizedBox(height: 20),
+                pw.Text(
+                  'Inspection Date: ${DateTime.now().toString().split(' ')[0]}',
+                ),
+              ],
+            ),
       ),
     );
 
     final directory = await getTemporaryDirectory();
-    final outputPath = '${directory.path}/IR_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final outputPath =
+        '${directory.path}/IR_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File(outputPath);
     await file.writeAsBytes(await pdf.save());
     return outputPath;
@@ -479,9 +507,20 @@ class ReportService {
     await OpenFile.open(filePath);
   }
 
-  Future<String> generatePDFFromMIR(MIRData mirData) async {
+  Future<String> generatePDFFromMIR(
+    MIRData mirData, {
+    String? signaturePath,
+    String? sealPath,
+  }) async {
     final pdf = pw.Document();
-    
+    pw.MemoryImage? signatureImage =
+        signaturePath != null && await File(signaturePath).exists()
+            ? pw.MemoryImage(await File(signaturePath).readAsBytes())
+            : null;
+    pw.MemoryImage? sealImage =
+        sealPath != null && await File(sealPath).exists()
+            ? pw.MemoryImage(await File(sealPath).readAsBytes())
+            : null;
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -607,30 +646,34 @@ class ReportService {
                       ),
                     ],
                   ),
-                  ...mirData.boqItems.map((item) => pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.refNo),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.description),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.unit),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.quantity),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.remarks),
-                      ),
-                    ],
-                  )).toList(),
+                  ...mirData.boqItems
+                      .map(
+                        (item) => pw.TableRow(
+                          children: [
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.refNo),
+                            ),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.description),
+                            ),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.unit),
+                            ),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.quantity),
+                            ),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.remarks),
+                            ),
+                          ],
+                        ),
+                      )
+                      .toList(),
                 ],
               ),
               pw.SizedBox(height: 20),
@@ -642,7 +685,9 @@ class ReportService {
                     children: [
                       pw.Padding(
                         padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('MAS/FAT Report/Dispatch Clearance - Approvals'),
+                        child: pw.Text(
+                          'MAS/FAT Report/Dispatch Clearance - Approvals',
+                        ),
                       ),
                       pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -657,7 +702,9 @@ class ReportService {
                           ),
                           pw.Padding(
                             padding: pw.EdgeInsets.all(5),
-                            child: pw.Text('Dispatch Clearance: ${mirData.dispatchStatus}'),
+                            child: pw.Text(
+                              'Dispatch Clearance: ${mirData.dispatchStatus}',
+                            ),
                           ),
                         ],
                       ),
@@ -720,7 +767,9 @@ class ReportService {
                     pw.SizedBox(height: 10),
                     pw.Text(mirData.engineerComments),
                     pw.SizedBox(height: 10),
-                    pw.Text('The above materials have been inspected on site/store and found at time of inspection to be:'),
+                    pw.Text(
+                      'The above materials have been inspected on site/store and found at time of inspection to be:',
+                    ),
                     pw.Row(
                       children: [
                         pw.Text('Satisfactory '),
@@ -729,7 +778,10 @@ class ReportService {
                           height: 20,
                           decoration: pw.BoxDecoration(
                             border: pw.Border.all(),
-                            color: mirData.isSatisfactory ? PdfColors.grey300 : null,
+                            color:
+                                mirData.isSatisfactory
+                                    ? PdfColors.grey300
+                                    : null,
                           ),
                         ),
                         pw.Text('     Unsatisfactory '),
@@ -738,7 +790,10 @@ class ReportService {
                           height: 20,
                           decoration: pw.BoxDecoration(
                             border: pw.Border.all(),
-                            color: !mirData.isSatisfactory ? PdfColors.grey300 : null,
+                            color:
+                                !mirData.isSatisfactory
+                                    ? PdfColors.grey300
+                                    : null,
                           ),
                         ),
                       ],
@@ -775,16 +830,43 @@ class ReportService {
                   pw.TableRow(
                     children: [
                       pw.Padding(
-                        padding: pw.EdgeInsets.all(20),
-                        child: pw.Center(child: pw.Text('ENVICON')),
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Container(
+                          height: 50,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(width: 1),
+                          ),
+                          child:
+                              signatureImage != null
+                                  ? pw.Image(
+                                    signatureImage,
+                                    fit: pw.BoxFit.contain,
+                                  )
+                                  : pw.Center(
+                                    child: pw.Text(
+                                      'Signature',
+                                      style: pw.TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                        ),
                       ),
                       pw.Padding(
-                        padding: pw.EdgeInsets.all(20),
-                        child: pw.Center(child: pw.Text('AECOM')),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(20),
-                        child: pw.Center(child: pw.Text('AADC')),
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Container(
+                          height: 50,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(width: 1),
+                          ),
+                          child:
+                              sealImage != null
+                                  ? pw.Image(sealImage, fit: pw.BoxFit.contain)
+                                  : pw.Center(
+                                    child: pw.Text(
+                                      'Seal',
+                                      style: pw.TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                        ),
                       ),
                     ],
                   ),
@@ -795,17 +877,28 @@ class ReportService {
         },
       ),
     );
-
     final directory = await getTemporaryDirectory();
-    final outputPath = '${directory.path}/MIR_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final outputPath =
+        '${directory.path}/MIR_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File(outputPath);
     await file.writeAsBytes(await pdf.save());
     return outputPath;
   }
 
-  Future<String> generatePDFFromIR(IRData irData) async {
+  Future<String> generatePDFFromIR(
+    IRData irData, {
+    String? signaturePath,
+    String? sealPath,
+  }) async {
     final pdf = pw.Document();
-    
+    pw.MemoryImage? signatureImage =
+        signaturePath != null && await File(signaturePath).exists()
+            ? pw.MemoryImage(await File(signaturePath).readAsBytes())
+            : null;
+    pw.MemoryImage? sealImage =
+        sealPath != null && await File(sealPath).exists()
+            ? pw.MemoryImage(await File(sealPath).readAsBytes())
+            : null;
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -931,30 +1024,34 @@ class ReportService {
                       ),
                     ],
                   ),
-                  ...irData.boqItems.map((item) => pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.refNo),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.description),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.unit),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.quantity),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(item.remarks),
-                      ),
-                    ],
-                  )).toList(),
+                  ...irData.boqItems
+                      .map(
+                        (item) => pw.TableRow(
+                          children: [
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.refNo),
+                            ),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.description),
+                            ),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.unit),
+                            ),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.quantity),
+                            ),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(item.remarks),
+                            ),
+                          ],
+                        ),
+                      )
+                      .toList(),
                 ],
               ),
               pw.SizedBox(height: 20),
@@ -966,7 +1063,9 @@ class ReportService {
                     children: [
                       pw.Padding(
                         padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('MAS/FAT Report/Dispatch Clearance - Approvals'),
+                        child: pw.Text(
+                          'MAS/FAT Report/Dispatch Clearance - Approvals',
+                        ),
                       ),
                       pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -981,7 +1080,9 @@ class ReportService {
                           ),
                           pw.Padding(
                             padding: pw.EdgeInsets.all(5),
-                            child: pw.Text('Dispatch Clearance: ${irData.dispatchStatus}'),
+                            child: pw.Text(
+                              'Dispatch Clearance: ${irData.dispatchStatus}',
+                            ),
                           ),
                         ],
                       ),
@@ -1044,7 +1145,9 @@ class ReportService {
                     pw.SizedBox(height: 10),
                     pw.Text(irData.engineerComments),
                     pw.SizedBox(height: 10),
-                    pw.Text('The above materials have been inspected on site/store and found at time of inspection to be:'),
+                    pw.Text(
+                      'The above materials have been inspected on site/store and found at time of inspection to be:',
+                    ),
                     pw.Row(
                       children: [
                         pw.Text('Satisfactory '),
@@ -1053,7 +1156,10 @@ class ReportService {
                           height: 20,
                           decoration: pw.BoxDecoration(
                             border: pw.Border.all(),
-                            color: irData.isSatisfactory ? PdfColors.grey300 : null,
+                            color:
+                                irData.isSatisfactory
+                                    ? PdfColors.grey300
+                                    : null,
                           ),
                         ),
                         pw.Text('     Unsatisfactory '),
@@ -1062,7 +1168,10 @@ class ReportService {
                           height: 20,
                           decoration: pw.BoxDecoration(
                             border: pw.Border.all(),
-                            color: !irData.isSatisfactory ? PdfColors.grey300 : null,
+                            color:
+                                !irData.isSatisfactory
+                                    ? PdfColors.grey300
+                                    : null,
                           ),
                         ),
                       ],
@@ -1099,16 +1208,43 @@ class ReportService {
                   pw.TableRow(
                     children: [
                       pw.Padding(
-                        padding: pw.EdgeInsets.all(20),
-                        child: pw.Center(child: pw.Text('ENVICON')),
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Container(
+                          height: 50,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(width: 1),
+                          ),
+                          child:
+                              signatureImage != null
+                                  ? pw.Image(
+                                    signatureImage,
+                                    fit: pw.BoxFit.contain,
+                                  )
+                                  : pw.Center(
+                                    child: pw.Text(
+                                      'Signature',
+                                      style: pw.TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                        ),
                       ),
                       pw.Padding(
-                        padding: pw.EdgeInsets.all(20),
-                        child: pw.Center(child: pw.Text('AECOM')),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(20),
-                        child: pw.Center(child: pw.Text('AADC')),
+                        padding: pw.EdgeInsets.all(5),
+                        child: pw.Container(
+                          height: 50,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(width: 1),
+                          ),
+                          child:
+                              sealImage != null
+                                  ? pw.Image(sealImage, fit: pw.BoxFit.contain)
+                                  : pw.Center(
+                                    child: pw.Text(
+                                      'Seal',
+                                      style: pw.TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                        ),
                       ),
                     ],
                   ),
@@ -1119,11 +1255,11 @@ class ReportService {
         },
       ),
     );
-
     final directory = await getTemporaryDirectory();
-    final outputPath = '${directory.path}/IR_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final outputPath =
+        '${directory.path}/IR_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File(outputPath);
     await file.writeAsBytes(await pdf.save());
     return outputPath;
   }
-}   
+}

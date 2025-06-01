@@ -54,7 +54,9 @@ dependencies:
   pdf: ^3.10.7  # For PDF generation
   open_file: ^3.3.2  # For opening generated PDFs
   flutter_dotenv: ^5.1.0  # For loading environment variables
-  share_plus: ^7.2.1  # For sharing PDFs
+  share_plus: ^7.2.1
+  signature: ^5.0.0
+  printing: ^5.14.0
 
 dev_dependencies:
   flutter_test:
