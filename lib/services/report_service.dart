@@ -11,6 +11,7 @@ import '../models/mir_data.dart';
 import '../models/ir_data.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:path/path.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 class ReportService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -512,6 +513,8 @@ class ReportService {
     String? signaturePath,
     String? sealPath,
   }) async {
+    final fontData = await rootBundle.load('lib/assets/Amiri-Regular.ttf');
+    final ttf = pw.Font.ttf(fontData);
     final pdf = pw.Document();
     pw.MemoryImage? signatureImage =
         signaturePath != null && await File(signaturePath).exists()
@@ -525,354 +528,275 @@ class ReportService {
       pw.Page(
         pageFormat: PdfPageFormat.a4,
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-            children: [
-              // Header with logos
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Container(
-                    width: 100,
-                    height: 50,
-                    child: pw.Center(child: pw.Text('Logo 1')),
-                    decoration: pw.BoxDecoration(border: pw.Border.all()),
-                  ),
-                  pw.Container(
-                    width: 100,
-                    height: 50,
-                    child: pw.Center(child: pw.Text('AECOM')),
-                    decoration: pw.BoxDecoration(border: pw.Border.all()),
-                  ),
-                  pw.Container(
-                    width: 100,
-                    height: 50,
-                    child: pw.Center(child: pw.Text('Logo 3')),
-                    decoration: pw.BoxDecoration(border: pw.Border.all()),
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-              // Title
-              pw.Center(
-                child: pw.Text(
-                  'MATERIAL INSPECTION REQUEST',
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-              ),
-              pw.SizedBox(height: 20),
-              // Project details table
-              pw.Table(
-                border: pw.TableBorder.all(),
-                columnWidths: {
-                  0: pw.FlexColumnWidth(1),
-                  1: pw.FlexColumnWidth(3),
-                },
-                children: [
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Project Name'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(mirData.projectName),
-                      ),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Contract No.'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(mirData.contractNo),
-                      ),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('MIR No.'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(mirData.mirNo),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 10),
-              // Description table
-              pw.Table(
-                border: pw.TableBorder.all(),
-                columnWidths: {
-                  0: pw.FlexColumnWidth(2),
-                  1: pw.FlexColumnWidth(4),
-                  2: pw.FlexColumnWidth(1),
-                  3: pw.FlexColumnWidth(1),
-                  4: pw.FlexColumnWidth(2),
-                },
-                children: [
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('B.O.Q Ref. no.'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Description'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Unit'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('BOQ Qty'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Remarks'),
-                      ),
-                    ],
-                  ),
-                  ...mirData.boqItems
-                      .map(
-                        (item) => pw.TableRow(
-                          children: [
-                            pw.Padding(
-                              padding: pw.EdgeInsets.all(5),
-                              child: pw.Text(item.refNo),
-                            ),
-                            pw.Padding(
-                              padding: pw.EdgeInsets.all(5),
-                              child: pw.Text(item.description),
-                            ),
-                            pw.Padding(
-                              padding: pw.EdgeInsets.all(5),
-                              child: pw.Text(item.unit),
-                            ),
-                            pw.Padding(
-                              padding: pw.EdgeInsets.all(5),
-                              child: pw.Text(item.quantity),
-                            ),
-                            pw.Padding(
-                              padding: pw.EdgeInsets.all(5),
-                              child: pw.Text(item.remarks),
-                            ),
-                          ],
-                        ),
-                      )
-                      .toList(),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-              // MAS/FAT Report section
-              pw.Table(
-                border: pw.TableBorder.all(),
-                children: [
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(
-                          'MAS/FAT Report/Dispatch Clearance - Approvals',
-                        ),
-                      ),
-                      pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Padding(
-                            padding: pw.EdgeInsets.all(5),
-                            child: pw.Text('MAS: ${mirData.masStatus}'),
-                          ),
-                          pw.Padding(
-                            padding: pw.EdgeInsets.all(5),
-                            child: pw.Text('DTS: ${mirData.dtsStatus}'),
-                          ),
-                          pw.Padding(
-                            padding: pw.EdgeInsets.all(5),
-                            child: pw.Text(
-                              'Dispatch Clearance: ${mirData.dispatchStatus}',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 10),
-              // Additional details
-              pw.Table(
-                border: pw.TableBorder.all(),
-                children: [
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Supplier Delivery Note/Date'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(mirData.supplierDeliveryNote),
-                      ),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Manufacturer'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(mirData.manufacturer),
-                      ),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Country of Origin'),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text(mirData.countryOfOrigin),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-              // Engineer's Comments
-              pw.Container(
-                decoration: pw.BoxDecoration(border: pw.Border.all()),
-                padding: pw.EdgeInsets.all(10),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+          return pw.Directionality(
+            textDirection: pw.TextDirection.rtl,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                // Header with logos
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text("Engineer's Comments:"),
-                    pw.SizedBox(height: 10),
-                    pw.Text(mirData.engineerComments),
-                    pw.SizedBox(height: 10),
-                    pw.Text(
-                      'The above materials have been inspected on site/store and found at time of inspection to be:',
+                    pw.Container(
+                      width: 80,
+                      height: 50,
+                      child: pw.Center(child: pw.Text('شعار الشركة', style: pw.TextStyle(font: ttf))),
+                      decoration: pw.BoxDecoration(border: pw.Border.all()),
                     ),
-                    pw.Row(
+                    pw.Column(
                       children: [
-                        pw.Text('Satisfactory '),
-                        pw.Container(
-                          width: 20,
-                          height: 20,
-                          decoration: pw.BoxDecoration(
-                            border: pw.Border.all(),
-                            color:
-                                mirData.isSatisfactory
-                                    ? PdfColors.grey300
-                                    : null,
-                          ),
+                        pw.Text('THE VILL : مشروع', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, font: ttf)),
+                        pw.Text('طلب فحص واستلام أعمال', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, font: ttf)),
+                      ],
+                    ),
+                    pw.Container(
+                      width: 80,
+                      height: 50,
+                      child: pw.Center(child: pw.Text('شعار الجهة', style: pw.TextStyle(font: ttf))),
+                      decoration: pw.BoxDecoration(border: pw.Border.all()),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+                // Top info table
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  columnWidths: {
+                    0: pw.FlexColumnWidth(1),
+                    1: pw.FlexColumnWidth(1),
+                    2: pw.FlexColumnWidth(1),
+                    3: pw.FlexColumnWidth(1),
+                    4: pw.FlexColumnWidth(1),
+                    5: pw.FlexColumnWidth(1),
+                  },
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Center(child: pw.Text('رقم الطلب', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('رقم المراجعة', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('التاريخ', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('المرجع', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('Mail', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('تاريخ الطلب', style: pw.TextStyle(font: ttf))),
+                      ],
+                    ),
+                    pw.TableRow(
+                      children: [
+                        pw.Center(child: pw.Text('21', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('2023/05/28', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('2B', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('2023/05/28', style: pw.TextStyle(font: ttf))),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+                // Consultant/Contractor/Project Name
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  columnWidths: {
+                    0: pw.FlexColumnWidth(1),
+                    1: pw.FlexColumnWidth(3),
+                  },
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text('الاستشاري', style: pw.TextStyle(font: ttf)),
                         ),
-                        pw.Text('     Unsatisfactory '),
-                        pw.Container(
-                          width: 20,
-                          height: 20,
-                          decoration: pw.BoxDecoration(
-                            border: pw.Border.all(),
-                            color:
-                                !mirData.isSatisfactory
-                                    ? PdfColors.grey300
-                                    : null,
-                          ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text('المكتب الاستشاري الهندسي أ. أحمد صبور', style: pw.TextStyle(font: ttf)),
+                        ),
+                      ],
+                    ),
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text('المقاول', style: pw.TextStyle(font: ttf)),
+                        ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text('', style: pw.TextStyle(font: ttf)),
+                        ),
+                      ],
+                    ),
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text('اسم المشروع', style: pw.TextStyle(font: ttf)),
+                        ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text(mirData.projectName, style: pw.TextStyle(font: ttf)),
                         ),
                       ],
                     ),
                   ],
                 ),
-              ),
-              pw.Spacer(),
-              // Footer signatures
-              pw.Table(
-                border: pw.TableBorder.all(),
-                columnWidths: {
-                  0: pw.FlexColumnWidth(1),
-                  1: pw.FlexColumnWidth(1),
-                  2: pw.FlexColumnWidth(1),
-                },
-                children: [
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Center(child: pw.Text('Contractor')),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Center(child: pw.Text('Consultant')),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Center(child: pw.Text('Client')),
-                      ),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Container(
-                          height: 50,
-                          decoration: pw.BoxDecoration(
-                            border: pw.Border.all(width: 1),
-                          ),
-                          child:
-                              signatureImage != null
-                                  ? pw.Image(
-                                    signatureImage,
-                                    fit: pw.BoxFit.contain,
-                                  )
-                                  : pw.Center(
-                                    child: pw.Text(
-                                      'Signature',
-                                      style: pw.TextStyle(fontSize: 12),
-                                    ),
-                                  ),
+                pw.SizedBox(height: 8),
+                // Work details
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  columnWidths: {
+                    0: pw.FlexColumnWidth(1),
+                    1: pw.FlexColumnWidth(3),
+                  },
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text('وصف الأعمال', style: pw.TextStyle(font: ttf)),
                         ),
-                      ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Container(
-                          height: 50,
-                          decoration: pw.BoxDecoration(
-                            border: pw.Border.all(width: 1),
-                          ),
-                          child:
-                              sealImage != null
-                                  ? pw.Image(sealImage, fit: pw.BoxFit.contain)
-                                  : pw.Center(
-                                    child: pw.Text(
-                                      'Seal',
-                                      style: pw.TextStyle(fontSize: 12),
-                                    ),
-                                  ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text('أعمال حدادة قواعد العمارة طبقاً للرسومات التنفيذية', style: pw.TextStyle(font: ttf)),
                         ),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+                // Notes
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text('ملاحظات', style: pw.TextStyle(font: ttf)),
+                        ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(5),
+                          child: pw.Text('', style: pw.TextStyle(font: ttf)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+                // Declaration
+                pw.Container(
+                  decoration: pw.BoxDecoration(border: pw.Border.all()),
+                  padding: pw.EdgeInsets.all(5),
+                  child: pw.Text('نشهد بأن الأعمال المنفذة مطابقة للمخططات والمواصفات الفنية المعتمدة وأن الموقع جاهز للاستلام. في حال وجود أي ملاحظات يتم ذكرها في موضع الملاحظات.', style: pw.TextStyle(font: ttf)),
+                ),
+                pw.SizedBox(height: 8),
+                // Signature and Seal section
+                pw.SizedBox(height: 24),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                  children: [
+                    pw.Container(
+                      width: 180,
+                      height: 100,
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(width: 1),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
+                      child: pw.Column(
+                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                        children: [
+                          signatureImage != null
+                              ? pw.Expanded(child: pw.Image(signatureImage, fit: pw.BoxFit.contain))
+                              : pw.Expanded(child: pw.SizedBox()),
+                          pw.Text('التوقيع', style: pw.TextStyle(font: ttf, fontSize: 20)),
+                        ],
+                      ),
+                    ),
+                    pw.Container(
+                      width: 180,
+                      height: 100,
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(width: 1),
+                      ),
+                      child: pw.Column(
+                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                        children: [
+                          sealImage != null
+                              ? pw.Expanded(child: pw.Image(sealImage, fit: pw.BoxFit.contain))
+                              : pw.Expanded(child: pw.SizedBox()),
+                          pw.Text('الختم', style: pw.TextStyle(font: ttf, fontSize: 20)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 16),
+                // Work section table
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  columnWidths: {
+                    0: pw.FlexColumnWidth(1),
+                    1: pw.FlexColumnWidth(2),
+                    2: pw.FlexColumnWidth(1),
+                    3: pw.FlexColumnWidth(1),
+                  },
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Center(child: pw.Text('مراجعة رقم', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('اسم الفرقة', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('رقم الفرقة', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('SEC-A', style: pw.TextStyle(font: ttf))),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+                // Inspection/approval section (empty for now)
+                pw.Container(
+                  height: 100,
+                  decoration: pw.BoxDecoration(border: pw.Border.all()),
+                ),
+                pw.SizedBox(height: 8),
+                // Approval table
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  columnWidths: {
+                    0: pw.FlexColumnWidth(1),
+                    1: pw.FlexColumnWidth(1),
+                    2: pw.FlexColumnWidth(1),
+                  },
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Center(child: pw.Text('اعتماد نظام الإشراف', style: pw.TextStyle(font: ttf))),
+                        pw.Center(child: pw.Text('', style: pw.TextStyle(font: ttf))), // Empty
+                        pw.Center(child: pw.Text('', style: pw.TextStyle(font: ttf))), // Empty
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+                // Final approval row
+                pw.Table(
+                  border: pw.TableBorder.all(),
+                  columnWidths: {
+                    0: pw.FlexColumnWidth(1),
+                    1: pw.FlexColumnWidth(1),
+                    2: pw.FlexColumnWidth(1),
+                    3: pw.FlexColumnWidth(1),
+                  },
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Center(child: pw.Text('اعتماد', style: pw.TextStyle(font: ttf))), // Approval
+                        pw.Center(child: pw.Text('قبول بملاحظات', style: pw.TextStyle(font: ttf))), // Accept with notes
+                        pw.Center(child: pw.Text('رفض', style: pw.TextStyle(font: ttf))), // Reject
+                        pw.Center(child: pw.Text('قبول بملاحظات', style: pw.TextStyle(font: ttf))), // Accept with notes
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           );
         },
       ),
