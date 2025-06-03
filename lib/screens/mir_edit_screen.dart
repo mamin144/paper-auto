@@ -1150,29 +1150,14 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                TextFormField(
-                                  initialValue: _mirData.mirNo,
-                                  decoration: InputDecoration(
-                                    labelText: 'MIR No.',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF3949AB),
-                                      ),
-                                    ),
-                                  ),
-                                  onChanged: (value) {
-                                    _updateMIRData(mirNo: value);
-                                  },
+                                _buildArabicTextField(
+                                  controller: _manufacturerController,
+                                  label: 'Manufacturer',
+                                ),
+                                const SizedBox(height: 16),
+                                _buildArabicTextField(
+                                  controller: _countryController,
+                                  label: 'Country of Origin',
                                 ),
                               ],
                             ),
@@ -1667,261 +1652,11 @@ class _MIREditScreenState extends State<MIREditScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _manufacturerController,
-                                  decoration: InputDecoration(
-                                    labelText: 'Manufacturer',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF3949AB),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _countryController,
-                                  decoration: InputDecoration(
-                                    labelText: 'Country of Origin',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF3949AB),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildModernCard(
-                            title: 'MAS/FAT Report Status',
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                DropdownButtonFormField<String>(
-                                  value:
-                                      _mirData.masStatus.isEmpty
-                                          ? null
-                                          : _mirData.masStatus,
-                                  decoration: InputDecoration(
-                                    labelText: 'MAS Status',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF3949AB),
-                                      ),
-                                    ),
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'approved',
-                                      child: Text('Approved'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'pending',
-                                      child: Text('Pending'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'rejected',
-                                      child: Text('Rejected'),
-                                    ),
-                                  ],
-                                  onChanged:
-                                      (value) =>
-                                          _updateMIRData(masStatus: value),
-                                ),
-                                const SizedBox(height: 16),
-                                DropdownButtonFormField<String>(
-                                  value:
-                                      _mirData.dtsStatus.isEmpty
-                                          ? null
-                                          : _mirData.dtsStatus,
-                                  decoration: InputDecoration(
-                                    labelText: 'DTS Status',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF3949AB),
-                                      ),
-                                    ),
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'approved',
-                                      child: Text('Approved'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'pending',
-                                      child: Text('Pending'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'rejected',
-                                      child: Text('Rejected'),
-                                    ),
-                                  ],
-                                  onChanged:
-                                      (value) =>
-                                          _updateMIRData(dtsStatus: value),
-                                ),
-                                const SizedBox(height: 16),
-                                DropdownButtonFormField<String>(
-                                  value:
-                                      _mirData.dispatchStatus.isEmpty
-                                          ? null
-                                          : _mirData.dispatchStatus,
-                                  decoration: InputDecoration(
-                                    labelText: 'Dispatch Clearance Status',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF3949AB),
-                                      ),
-                                    ),
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'approved',
-                                      child: Text('Approved'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'pending',
-                                      child: Text('Pending'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'rejected',
-                                      child: Text('Rejected'),
-                                    ),
-                                  ],
-                                  onChanged:
-                                      (value) =>
-                                          _updateMIRData(dispatchStatus: value),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildModernCard(
-                            title: "Engineer's Comments",
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                TextFormField(
+                                _buildArabicTextField(
                                   controller: _commentsController,
+                                  label: '',
+                                  hintText: 'Enter comments here...',
                                   maxLines: 3,
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF3949AB),
-                                      ),
-                                    ),
-                                    hintText: 'Enter comments here...',
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Wrap(
-                                  spacing: 16,
-                                  runSpacing: 8,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    const Text(
-                                      'Inspection Result:',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF3949AB),
-                                      ),
-                                    ),
-                                    ChoiceChip(
-                                      label: const Text('Satisfactory'),
-                                      selected: _mirData.isSatisfactory,
-                                      onSelected: (selected) {
-                                        _updateMIRData(isSatisfactory: true);
-                                      },
-                                      backgroundColor: Colors.grey[200],
-                                      selectedColor: Colors.green[100],
-                                      labelStyle: TextStyle(
-                                        color:
-                                            _mirData.isSatisfactory
-                                                ? Colors.green[800]
-                                                : Colors.grey[800],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    ChoiceChip(
-                                      label: const Text('Unsatisfactory'),
-                                      selected: !_mirData.isSatisfactory,
-                                      onSelected: (selected) {
-                                        _updateMIRData(isSatisfactory: false);
-                                      },
-                                      backgroundColor: Colors.grey[200],
-                                      selectedColor: Colors.red[100],
-                                      labelStyle: TextStyle(
-                                        color:
-                                            !_mirData.isSatisfactory
-                                                ? Colors.red[800]
-                                                : Colors.grey[800],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ],
                             ),
@@ -2292,8 +2027,48 @@ class _MIREditScreenState extends State<MIREditScreen> {
       labelStyle: TextStyle(
         color: Colors.grey[600],
         fontWeight: FontWeight.w500,
+        fontFamily: 'Amiri',
       ),
-      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+      hintStyle: TextStyle(
+        color: Colors.grey[400],
+        fontSize: 14,
+        fontFamily: 'Amiri',
+      ),
+    );
+  }
+
+  Widget _buildArabicTextField({
+    required TextEditingController controller,
+    required String label,
+    String? hintText,
+    int? maxLines,
+    Function(String)? onChanged,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines ?? 1,
+      textDirection: TextDirection.rtl,
+      textAlign: TextAlign.right,
+      style: const TextStyle(fontFamily: 'Amiri', fontSize: 16),
+      decoration: _buildInputDecoration(
+        label: label,
+        hintText: hintText,
+      ).copyWith(alignLabelWithHint: true),
+      onChanged: (value) {
+        if (onChanged != null) {
+          onChanged(value);
+        }
+        setState(() {
+          // Force a rebuild to ensure the text is displayed
+          controller.text = value;
+        });
+      },
+      keyboardType: TextInputType.text,
+      textInputAction: TextInputAction.next,
+      enableInteractiveSelection: true,
+      cursorColor: const Color(0xFF3949AB),
+      cursorWidth: 2.0,
+      cursorRadius: const Radius.circular(1.0),
     );
   }
 

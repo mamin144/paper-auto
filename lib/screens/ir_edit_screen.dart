@@ -891,14 +891,14 @@ class _IREditScreenState extends State<IREditScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                TextFormField(
-                                  initialValue: _irData.irNo,
-                                  decoration: _buildInputDecoration(
-                                    label: 'IR No.',
-                                  ),
-                                  onChanged: (value) {
-                                    _updateIRData(irNo: value);
-                                  },
+                                _buildArabicTextField(
+                                  controller: _manufacturerController,
+                                  label: 'Manufacturer',
+                                ),
+                                const SizedBox(height: 16),
+                                _buildArabicTextField(
+                                  controller: _countryController,
+                                  label: 'Country of Origin',
                                 ),
                               ],
                             ),
@@ -1208,18 +1208,14 @@ class _IREditScreenState extends State<IREditScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                TextFormField(
+                                _buildArabicTextField(
                                   controller: _manufacturerController,
-                                  decoration: _buildInputDecoration(
-                                    label: 'Manufacturer',
-                                  ),
+                                  label: 'Manufacturer',
                                 ),
                                 const SizedBox(height: 16),
-                                TextFormField(
+                                _buildArabicTextField(
                                   controller: _countryController,
-                                  decoration: _buildInputDecoration(
-                                    label: 'Country of Origin',
-                                  ),
+                                  label: 'Country of Origin',
                                 ),
                               ],
                             ),
@@ -1319,13 +1315,11 @@ class _IREditScreenState extends State<IREditScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                TextFormField(
+                                _buildArabicTextField(
                                   controller: _commentsController,
+                                  label: '',
+                                  hintText: 'Enter comments here...',
                                   maxLines: 3,
-                                  decoration: _buildInputDecoration(
-                                    label: '',
-                                    hintText: 'Enter comments here...',
-                                  ),
                                 ),
                                 const SizedBox(height: 16),
                                 Wrap(
@@ -1668,11 +1662,13 @@ class _IREditScreenState extends State<IREditScreen> {
   InputDecoration _buildInputDecoration({
     required String label,
     String? hintText,
+    Widget? prefixIcon,
     bool isDense = false,
   }) {
     return InputDecoration(
       labelText: label,
       hintText: hintText,
+      prefixIcon: prefixIcon,
       isDense: isDense,
       contentPadding:
           isDense
@@ -1695,8 +1691,50 @@ class _IREditScreenState extends State<IREditScreen> {
       labelStyle: TextStyle(
         color: Colors.grey[600],
         fontWeight: FontWeight.w500,
+        fontFamily: 'Amiri',
       ),
-      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+      hintStyle: TextStyle(
+        color: Colors.grey[400],
+        fontSize: 14,
+        fontFamily: 'Amiri',
+      ),
+    );
+  }
+
+  Widget _buildArabicTextField({
+    required TextEditingController controller,
+    required String label,
+    String? hintText,
+    int? maxLines,
+    bool isDense = false,
+    Function(String)? onChanged,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines ?? 1,
+      textDirection: TextDirection.rtl,
+      textAlign: TextAlign.right,
+      style: const TextStyle(fontFamily: 'Amiri', fontSize: 16),
+      decoration: _buildInputDecoration(
+        label: label,
+        hintText: hintText,
+        isDense: isDense,
+      ).copyWith(alignLabelWithHint: true),
+      onChanged: (value) {
+        if (onChanged != null) {
+          onChanged(value);
+        }
+        setState(() {
+          // Force a rebuild to ensure the text is displayed
+          controller.text = value;
+        });
+      },
+      keyboardType: TextInputType.text,
+      textInputAction: TextInputAction.next,
+      enableInteractiveSelection: true,
+      cursorColor: const Color(0xFF3949AB),
+      cursorWidth: 2.0,
+      cursorRadius: const Radius.circular(1.0),
     );
   }
 
